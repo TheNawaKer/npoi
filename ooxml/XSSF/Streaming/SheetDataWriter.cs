@@ -490,11 +490,14 @@ namespace NPOI.XSSF.Streaming
 					// Special characters
 					case '\n':
 					case '\r':
-						if (counter > last)
+						if (counter > 0 && chars[counter - 1] != '\r')
 						{
-							WriteAsBytes(OutputStream, GetSubArray(chars, last, counter - last));
+							if (counter > last)
+							{
+								WriteAsBytes(OutputStream, GetSubArray(chars, last, counter - last));
+							}
+							WriteAsBytes(OutputStream, "&#xa;".ToCharArray());
 						}
-						WriteAsBytes(OutputStream, "&#xa;".ToCharArray());
 						last = counter + 1;
 						break;
 					case '\t':
