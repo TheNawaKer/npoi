@@ -481,7 +481,7 @@ namespace NPOI.XSSF.Streaming
 			if (bestFitWidth > 0)
 			{
 				int maxColumnWidth = 255 * 256; // The maximum column width for an individual cell is 255 characters
-				int width = Math.Max(bestFitWidth, maxColumnWidth);
+				int width = Math.Min(bestFitWidth, maxColumnWidth);
 				SetColumnWidth(column, width);
 			}
 		}
@@ -601,7 +601,7 @@ namespace NPOI.XSSF.Streaming
 
 		public IEnumerator GetEnumerator()
 		{
-			return _sh.GetEnumerator();
+			return _rows.Values.GetEnumerator();
 		}
 
 		public double GetMargin(MarginType margin)
@@ -620,6 +620,12 @@ namespace NPOI.XSSF.Streaming
 				return _rows[rownum];
 			return null;
 		}
+
+		public int GetRow(IRow row)
+		{
+			return _rows.Where(r => r.Value == row).First().Key;
+		}
+
 
 		public IEnumerator GetRowEnumerator()
 		{
@@ -960,10 +966,9 @@ namespace NPOI.XSSF.Streaming
 
 		private void flushOneRow()
 		{
-
-			int firstRowNum = _rows.FirstOrDefault().Key;
-			if (firstRowNum != null)
+			if (_rows != null && _rows.Any())
 			{
+				int firstRowNum = _rows.FirstOrDefault().Key;
 				int rowIndex = firstRowNum;
 				SXSSFRow row = _rows[firstRowNum];
 				// Update the best fit column widths for auto-sizing just before the rows are flushed

@@ -119,7 +119,10 @@ namespace NPOI.XSSF.Streaming
 
 		public int RowNum
 		{
-			get { throw new NotImplementedException();/*return Sheet.GetRow(this);*/ }
+			get
+			{
+				return _sheet.GetRow(this);
+			}
 
 			set
 			{
