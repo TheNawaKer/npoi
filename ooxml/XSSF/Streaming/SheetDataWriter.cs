@@ -197,10 +197,9 @@ namespace NPOI.XSSF.Streaming
 			NumberOfFlushedRows++;
 			BeginRow(rownum, row);
 			var cells = row.GetEnumerator();
-			int columnIndex = 0;
 			while (cells.MoveNext())
 			{
-				WriteCell(columnIndex++, cells.Current);
+				WriteCell(cells.Current.ColumnIndex, cells.Current);
 			}
 			EndRow();
 		}
