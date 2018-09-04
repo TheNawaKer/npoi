@@ -305,7 +305,7 @@ namespace NPOI.XSSF.Streaming
 
 			public ICell Current
 			{
-				get { return _cells[pos]; }
+				get { return _cells.Values.ElementAtOrDefault(pos); }
 			}
 
 			object IEnumerator.Current
@@ -329,7 +329,7 @@ namespace NPOI.XSSF.Streaming
 			public bool MoveNext()
 			{
 				pos += 1;
-				return _cells.ContainsKey(pos);
+				return pos < _cells.Count;
 			}
 
 			public void Reset()
