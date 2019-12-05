@@ -27,11 +27,12 @@ namespace NPOI.XWPF.UserModel
     using System.Xml.Serialization;
     using NPOI.OpenXmlFormats.Dml.WordProcessing;
     using NPOI.WP.UserModel;
+	using System.Linq;
 
-    /**
+	/**
      * @see <a href="http://msdn.microsoft.com/en-us/library/ff533743(v=office.12).aspx">[MS-OI29500] Run Fonts</a> 
      */
-    public enum FontCharRange
+	public enum FontCharRange
     {
         None,
         Ascii /* char 0-127 */,
@@ -165,6 +166,13 @@ namespace NPOI.XWPF.UserModel
                         GetPictures(inline.graphic.graphicData, pictures);
                     }
                 }
+				if (drawing.anchor != null)
+				{
+					foreach (CT_Anchor anchor in drawing.anchor)
+					{
+						GetPictures(anchor.graphic.graphicData, pictures);
+					}
+				}
             }
             else if (o is CT_GraphicalObjectData)
             {
@@ -1152,12 +1160,131 @@ namespace NPOI.XWPF.UserModel
 
         }
 
-        /**
+		/**
+         * Adds a picture to the run. This method handles
+         *  attaching the picture data to the overall file.
+         *  
+         * @see NPOI.XWPF.UserModel.Document#PICTURE_TYPE_EMF
+         * @see NPOI.XWPF.UserModel.Document#PICTURE_TYPE_WMF
+         * @see NPOI.XWPF.UserModel.Document#PICTURE_TYPE_PICT
+         * @see NPOI.XWPF.UserModel.Document#PICTURE_TYPE_JPEG
+         * @see NPOI.XWPF.UserModel.Document#PICTURE_TYPE_PNG
+         * @see NPOI.XWPF.UserModel.Document#PICTURE_TYPE_DIB
+         *  
+         * @param pictureData The raw picture data
+         * @param pictureType The type of the picture, eg {@link Document#PICTURE_TYPE_JPEG}
+         * @param width width in EMUs. To convert to / from points use {@link org.apache.poi.util.Units}
+         * @param height height in EMUs. To convert to / from points use {@link org.apache.poi.util.Units}
+         * @throws NPOI.Openxml4j.exceptions.InvalidFormatException 
+         * @throws IOException 
+         */
+		public XWPFPicture ReplacePicture(uint oldId, CT_Anchor oldAnchor, CT_Inline oldInline, Stream pictureData, int pictureType, string filename)
+		{
+			XWPFDocument doc = parent.Document;
+			
+			XWPFPicture picture = this.pictures.FirstOrDefault(p => p.GetDrawingId() == oldId);
+			if (picture == null)
+				throw (new NullReferenceException("The picture doesn't exist"));
+			var oldblip = picture.GetCTPicture().blipFill;
+			var oldnvPicPr = picture.GetCTPicture().nvPicPr;
+			var oldspPr = picture.GetCTPicture().spPr;
+
+			// We remove the old image
+			doc.RemoveRelation(picture.GetPictureData(), RemoveUnusedParts: true);
+			//pictures.Remove(picture);
+
+			// Add the picture + relationship
+			string relationId = doc.AddPictureData(pictureData, pictureType);
+			XWPFPictureData picData = (XWPFPictureData)doc.GetRelationById(relationId);
+
+			// Create the Drawing entry for it
+			long id = parent.Document.DrawingIdManager.ReserveNew();
+			if (oldAnchor != null)
+			{
+				oldAnchor.docPr.id = (uint)id;
+				oldAnchor.docPr.name = "Drawing " + id;
+				oldAnchor.docPr.descr = filename;
+				//if (drawing.anchor == null)
+				//	drawing.anchor = new List<CT_Anchor>();
+				//drawing.anchor.Add(oldAnchor);
+			}
+			else if (oldInline != null)
+			{
+				oldInline.docPr.id = (uint)id;
+				oldInline.docPr.name = "Drawing " + id;
+				oldInline.docPr.descr = filename;
+				//if (drawing.inline == null)
+				//	drawing.inline = new List<CT_Inline>();
+				//drawing.inline.Add(inline);
+			}
+			
+			// Do the fiddly namespace bits on the inline
+			// (We need full control of what goes where and as what)
+			//CT_GraphicalObject tmp = new CT_GraphicalObject();
+			//String xml =
+			//    "<a:graphic xmlns:a=\"" + "http://schemas.openxmlformats.org/drawingml/2006/main" + "\">" +
+			//    "<a:graphicData uri=\"" + "http://schemas.openxmlformats.org/drawingml/2006/picture" + "\">" +
+			//    "<pic:pic xmlns:pic=\"" + "http://schemas.openxmlformats.org/drawingml/2006/picture" + "\" />" +
+			//    "</a:graphicData>" +
+			//    "</a:graphic>";
+			//inline.Set((xml));
+
+			XmlDocument xmlDoc = new XmlDocument();
+			//XmlElement el = xmlDoc.CreateElement("pic", "pic", "http://schemas.openxmlformats.org/drawingml/2006/picture");
+
+			//// Grab the picture object
+			//NPOI.OpenXmlFormats.Dml.Picture.CT_Picture pic = new OpenXmlFormats.Dml.Picture.CT_Picture();
+
+			//// Set it up
+			//NPOI.OpenXmlFormats.Dml.Picture.CT_PictureNonVisual nvPicPr = pic.AddNewNvPicPr();
+			//nvPicPr = oldnvPicPr;
+
+			//NPOI.OpenXmlFormats.Dml.CT_NonVisualDrawingProps cNvPr = nvPicPr.AddNewCNvPr();
+			///* use "0" for the id. See ECM-576, 20.2.2.3 */
+			//cNvPr.id = (0);
+			///* This name is not visible in Word 2010 anywhere */
+			//cNvPr.name = ("Picture " + id);
+			//cNvPr.descr = (filename);
+
+			//pic.blipFill = oldblip;
+			//pic.blipFill.blip.embed = (picData.GetPackageRelationship().Id);
+			picture.SetPictureReference(picData.GetPackageRelationship());
+			picture.GetCTPicture().nvPicPr.cNvPr.id = (0);
+			///* This name is not visible in Word 2010 anywhere */
+			picture.GetCTPicture().nvPicPr.cNvPr.name = ("Picture " + id);
+			picture.GetCTPicture().nvPicPr.cNvPr.descr = (filename);
+
+			using (var ms = new MemoryStream())
+			{
+				StreamWriter sw = new StreamWriter(ms);
+				picture.GetCTPicture().Write(sw, "pic:pic");
+				sw.Flush();
+				ms.Position = 0;
+				var sr = new StreamReader(ms);
+				var picXml = sr.ReadToEnd();
+				if (oldAnchor != null)
+				{
+					oldAnchor.graphic.graphicData.Any.RemoveAll(_ => true);
+					oldAnchor.graphic.graphicData.AddPicElement(picXml);
+				}
+				else if (oldInline != null)
+				{
+					oldInline.graphic.graphicData.Any.RemoveAll(_ => true);
+					oldInline.graphic.graphicData.AddPicElement(picXml);
+				}
+			}
+			// Finish up
+			//pictures.Add(picture);
+			return picture;
+
+		}
+
+		/**
          * Returns the embedded pictures of the run. These
          *  are pictures which reference an external, 
          *  embedded picture image such as a .png or .jpg
          */
-        public List<XWPFPicture> GetEmbeddedPictures()
+		public List<XWPFPicture> GetEmbeddedPictures()
         {
             return pictures;
         }

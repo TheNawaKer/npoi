@@ -267,7 +267,7 @@ namespace NPOI.OpenXmlFormats.Dml
 
         internal void Write(StreamWriter sw, string nodeName)
         {
-            sw.Write(string.Format("<a:{0}", nodeName));
+            sw.Write(string.Format("<wp:{0}", nodeName));
             XmlHelper.WriteAttribute(sw, "x", this.x, true);
             XmlHelper.WriteAttribute(sw, "y", this.y, true);
             sw.Write("/>");

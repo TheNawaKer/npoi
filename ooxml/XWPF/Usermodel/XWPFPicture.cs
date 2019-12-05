@@ -93,6 +93,11 @@ namespace NPOI.XWPF.UserModel
         {
             return description;
         }
+
+		public uint GetDrawingId()
+		{
+			return ctPic.nvPicPr.cNvPr.id;
+		}
     }
 
 }
