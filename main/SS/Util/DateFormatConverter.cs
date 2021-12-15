@@ -23,26 +23,23 @@ using NPOI.Util;
 
 namespace NPOI.SS.Util
 {
-    /**
-     *  Convert DateFormat patterns into Excel custom number formats.
-     *  For example, to format a date in excel using the "dd MMMM, yyyy" pattern and Japanese
-     *  locale, use the following code:
-     *
-     *  <pre><code>
-     *      // returns "[$-0411]dd MMMM, yyyy;@" where the [$-0411] prefix tells Excel to use the Japanese locale
-     *      String excelFormatPattern = DateFormatConverter.convert(Locale.JAPANESE, "dd MMMM, yyyy");
-     *
-     *      CellStyle cellStyle = workbook.createCellStyle();
-     *
-     *      DataFormat poiFormat = workbook.createDataFormat();
-     *      cellStyle.setDataFormat(poiFormat.getFormat(excelFormatPattern));
-     *      cell.setCellValue(new Date());
-     *      cell.setCellStyle(cellStyle);  // formats date as '2012\u5e743\u670817\u65e5'
-     *
-     *  </code></pre>
-     *
-     *
-     */
+
+    /// <summary>
+    ///  Convert DateFormat patterns into Excel custom number formats.
+    /// For example, to format a date in excel using the "dd MMMM, yyyy" pattern and Japanese
+    ///  locale, use the following code:
+    /// </summary>
+    /// <example>
+    ///      returns "[$-0411]dd MMMM, yyyy;@" where the [$-0411] prefix tells Excel to use the Japanese locale
+    ///      String excelFormatPattern = DateFormatConverter.convert(Locale.JAPANESE, "dd MMMM, yyyy");
+    ///
+    ///      CellStyle cellStyle = workbook.createCellStyle();
+    ///
+    ///      DataFormat poiFormat = workbook.createDataFormat();
+    ///      cellStyle.setDataFormat(poiFormat.getFormat(excelFormatPattern));
+    ///      cell.setCellValue(new Date());
+    ///      cell.setCellStyle(cellStyle);  // formats date as '2012\u5e743\u670817\u65e5'
+    ///</example>
     public class DateFormatConverter
     {
         private static POILogger logger = POILogFactory.GetLogger(typeof(DateFormatConverter));
@@ -342,26 +339,36 @@ namespace NPOI.SS.Util
         public static string GetPrefixForLocale(CultureInfo locale)
         {
             string localeString = locale.ToString().ToLower();
-            string result = localePrefixes[localeString];
-            if (result == null)
+            string result = null;
+            if (!localePrefixes.ContainsKey(localeString))
             {
-                result = localePrefixes[localeString.Substring(0, 2)];
-                if (result == null)
+                string name = localeString.IndexOf("-") > 0 ? localeString.Substring(0, localeString.IndexOf("-")) :
+                    localeString;
+                if (!localePrefixes.ContainsKey(name))
                 {
-                    CultureInfo parentLocale = CultureInfo.GetCultureInfo(localeString.Substring(0, 2));
+                    CultureInfo parentLocale = CultureInfo.GetCultureInfo(name);
                     logger.Log(POILogger.ERROR, "Unable to find prefix for " + locale + "(" + locale.DisplayName + ") or "
-                            + localeString.Substring(0, 2) + "(" + parentLocale.DisplayName + ")");
+                            + name + "(" + parentLocale.DisplayName + ")");
                     return "";
                 }
+                else
+                {
+                    result = localePrefixes[name];
+                }
+            }
+            else
+            {
+                result = localePrefixes[localeString];
             }
             return result;
         }
 
-        //public static string Convert(CultureInfo locale, DateFormat df)
-        //{
-        //    string ptrn = ((SimpleDateFormat)df).ToPattern();
-        //    return convert(locale, ptrn);
-        //}
+        public static string Convert(CultureInfo locale, DateFormat df)
+        {
+            throw new NotImplementedException("DateFormatConverter.Convert with DateFormat is not implemented");
+            //string ptrn = ((SimpleDateFormat)df).ToPattern();
+            //    return convert(locale, ptrn);
+        }
 
         public static string Convert(CultureInfo locale, string format)
         {
@@ -383,8 +390,14 @@ namespace NPOI.SS.Util
                 else
                 {
                     // It's a code, translate it if necessary
-                    string mappedToken = tokenConversions[(token)];
-                    result.Append(mappedToken == null ? token : mappedToken);
+                    if (!tokenConversions.ContainsKey(token))
+                    {
+                        result.Append(token);
+                    } else
+                    {
+                        string mappedToken = tokenConversions[(token)];
+                        result.Append(mappedToken);
+                    }
                 }
             }
             result.Append(";@");
@@ -411,55 +424,4 @@ namespace NPOI.SS.Util
 
     }
 
-    public class DateFormat
-    {
-        public const int FULL = 0;
-        public const int LONG = 1;
-        public const int MEDIUM = 2;
-        public const int SHORT = 3;
-        public const int DEFAULT = MEDIUM;
-
-        public static string GetDateTimePattern(int dateStyle, int timeStyle, CultureInfo locale)
-        {
-            DateTimeFormatInfo dfi = locale.DateTimeFormat;
-            string datePattern = GetDatePattern(dateStyle,locale);
-            string timePattern = GetTimePattern(timeStyle, locale);
-
-            if (locale.TextInfo.IsRightToLeft)
-                return timePattern + " " + datePattern;//Is this right???
-            else
-                return datePattern + " " + timePattern;
-        }
-        public static string GetDatePattern(int dateStyle, CultureInfo locale)
-        {
-            DateTimeFormatInfo dfi = locale.DateTimeFormat;
-            switch (dateStyle)
-            {
-                case DateFormat.SHORT:
-                    return dfi.ShortDatePattern.Replace("yyyy", "yy").Replace("YYYY", "YY");
-                case DateFormat.MEDIUM:
-                    return dfi.ShortDatePattern;
-                case DateFormat.LONG:
-                    return dfi.LongDatePattern.Replace("dddd,", "").Trim();
-                case DateFormat.FULL:
-                    return dfi.LongDatePattern;
-                default:
-                    return dfi.ShortDatePattern;
-            }
-        }
-        public static string GetTimePattern(int timeStyle, CultureInfo locale)
-        {
-            DateTimeFormatInfo dfi = locale.DateTimeFormat;
-            switch (timeStyle)
-            {
-                case DateFormat.SHORT:
-                    return dfi.ShortTimePattern;
-                case DateFormat.MEDIUM:
-                case DateFormat.LONG:
-                case DateFormat.FULL:
-                default:
-                    return dfi.LongTimePattern;
-            }
-        }
-    }
 }

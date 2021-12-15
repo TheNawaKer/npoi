@@ -115,7 +115,7 @@ namespace NPOI.SS.Converter
         }
         public static XmlDocument Process(string excelFile)
         {
-            IWorkbook workbook = WorkbookFactory.Create(excelFile);
+            IWorkbook workbook = WorkbookFactory.Create(excelFile, null);
             ExcelToHtmlConverter excelToHtmlConverter = new ExcelToHtmlConverter();
             excelToHtmlConverter.ProcessWorkbook(workbook);
             return excelToHtmlConverter.Document;
@@ -674,8 +674,7 @@ namespace NPOI.SS.Converter
             {
                 style.Append("white-space: pre-wrap; ");
                 ExcelToHtmlUtils.AppendAlign(style, cellStyle.Alignment);
-                StylesTable st = ((XSSFWorkbook)workbook).GetStylesSource();
-                ThemesTable tt = st.GetTheme();
+
                 if (cellStyle.FillPattern == FillPattern.NoFill)
                 {
                     // no fill
@@ -741,7 +740,10 @@ namespace NPOI.SS.Converter
 
             if (workbook is HSSFWorkbook)
             {
-                HSSFColor color = ((HSSFWorkbook)workbook).GetCustomPalette().GetColor(borderColor);
+                var customPalette = ((HSSFWorkbook) workbook).GetCustomPalette();
+                HSSFColor color = null;
+                if (customPalette != null)
+                    color = customPalette.GetColor(borderColor);
                 if (color != null)
                 {
                     borderStyle.Append(' ');
@@ -758,7 +760,14 @@ namespace NPOI.SS.Converter
                 }
                 else
                 {
-                    XSSFColor color = ((XSSFWorkbook)workbook).GetStylesSource().GetTheme().GetThemeColor(borderColor);
+                    XSSFColor color = null;
+                    var stylesSource = ((XSSFWorkbook) workbook).GetStylesSource();
+                    if (stylesSource != null)
+                    {
+                        var theme = stylesSource.GetTheme();
+                        if (theme != null)
+                            color = theme.GetThemeColor(borderColor);
+                    }
                     if (color != null)
                     {
                         borderStyle.Append(' ');
@@ -785,7 +794,10 @@ namespace NPOI.SS.Converter
 
             if (workbook is HSSFWorkbook)
             {
-                HSSFColor fontColor = ((HSSFWorkbook)workbook).GetCustomPalette().GetColor(font.Color);
+                var customPalette = ((HSSFWorkbook) workbook).GetCustomPalette();
+                HSSFColor fontColor=null;
+                if(customPalette!=null)
+                    fontColor = customPalette.GetColor(font.Color);
                 if (fontColor != null)
                     style.AppendFormat("color:{0}; " ,ExcelToHtmlUtils.GetColor(fontColor) );
             }

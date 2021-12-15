@@ -15,8 +15,8 @@
    limitations under the License.
 ==================================================================== */
 using System;
+using System.Globalization;
 using System.IO;
-using System.Linq;
 using System.Text;
 using NPOI.OpenXmlFormats.Spreadsheet;
 using NPOI.SS.UserModel;
@@ -32,45 +32,46 @@ namespace NPOI.XSSF.Streaming
 	{
 		private static POILogger logger = POILogFactory.GetLogger(typeof(SheetDataWriter));
 
-		protected FileInfo TemporaryFileInfo { get; set; }
-		protected Stream OutputStream { get; set; }
-		private int RowNum { get; set; }
-		public int NumberOfFlushedRows { get; set; }
-		public int LowestIndexOfFlushedRows { get; set; } // meaningful only of _numberOfFlushedRows>0
-		public int NumberOfCellsOfLastFlushedRow { get; set; } // meaningful only of _numberOfFlushedRows>0
-		public int NumberLastFlushedRow = -1; // meaningful only of _numberOfFlushedRows>0
+        protected FileInfo TemporaryFileInfo { get; set; }
+        protected Stream OutputStream { get; private set; }
+        private int RowNum { get; set; }
+        public int NumberOfFlushedRows { get; set; }
+        public int LowestIndexOfFlushedRows { get; set; } = -1; // meaningful only of _numberOfFlushedRows>0
+        public int NumberOfCellsOfLastFlushedRow { get; set; } // meaningful only of _numberOfFlushedRows>0
+        public int NumberLastFlushedRow = -1; // meaningful only of _numberOfFlushedRows>0
 
-		/**
- * Table of strings shared across this workbook.
- * If two cells contain the same string, then the cell value is the same index into SharedStringsTable
- */
-		private SharedStringsTable _sharedStringSource;
-		private StylesTable _stylesSource;
+        /**
+         * Table of strings shared across this workbook.
+         * If two cells contain the same string, then the cell value is the same index into SharedStringsTable
+         */
+        private SharedStringsTable _sharedStringSource;
+        private StreamWriter _outputWriter;
+        private StylesTable _stylesSource;
 
-		public SheetDataWriter()
-		{
-			TemporaryFileInfo = CreateTempFile();
-			OutputStream = CreateWriter(TemporaryFileInfo);
-		}
-		public SheetDataWriter(SharedStringsTable sharedStringsTable, StylesTable stylesSource)
-			: this()
-		{
-			_sharedStringSource = sharedStringsTable;
-			_stylesSource = stylesSource;
-		}
-		/**
- * Create a temp file to write sheet data. 
- * By default, temp files are created in the default temporary-file directory
- * with a prefix "poi-sxssf-sheet" and suffix ".xml".  Subclasses can override 
- * it and specify a different temp directory or filename or suffix, e.g. <code>.gz</code>
- * 
- * @return temp file to write sheet data
- */
+        public SheetDataWriter()
+        {
+            TemporaryFileInfo = CreateTempFile();
+            OutputStream = CreateWriter(TemporaryFileInfo);
+            _outputWriter = new StreamWriter(OutputStream, Encoding.UTF8);
+        }
+        public SheetDataWriter(SharedStringsTable sharedStringsTable, StylesTable stylesSource) : this()
+        {
+            _sharedStringSource = sharedStringsTable;
+            _stylesSource = stylesSource;
+        }
+        /**
+         * Create a temp file to write sheet data. 
+         * By default, temp files are created in the default temporary-file directory
+         * with a prefix "poi-sxssf-sheet" and suffix ".xml".  Subclasses can override 
+         * it and specify a different temp directory or filename or suffix, e.g. <code>.gz</code>
+         * 
+         * @return temp file to write sheet data
+         */
 
-		public virtual FileInfo CreateTempFile()
-		{
-			return TempFile.CreateTempFile("poi-sxssf-sheet", ".xml");
-		}
+        public virtual FileInfo CreateTempFile()
+        {
+            return TempFile.CreateTempFile("poi-sxssf-sheet", ".xml");
+        }
 
 		/**
 		 * Create a writer for the sheet data.
@@ -80,17 +81,17 @@ namespace NPOI.XSSF.Streaming
 		public virtual Stream CreateWriter(FileInfo fd)
 		{
 
-			FileStream fos = new FileStream(fd.FullName, FileMode.OpenOrCreate, FileAccess.ReadWrite);
-			Stream outputStream = null;
-			try
-			{
-				outputStream = DecorateOutputStream(fos);
-			}
-			catch (Exception e)
-			{
-				fos.Close();
-				throw e;
-			}
+            FileStream fos = new FileStream(fd.FullName, FileMode.OpenOrCreate, FileAccess.ReadWrite);
+            Stream outputStream = null;
+            try
+            {
+                outputStream = DecorateOutputStream(fos);
+            }
+            catch (Exception)
+            {
+                fos.Close();
+                throw;
+            }
 
 			return outputStream;
 		}
@@ -110,48 +111,56 @@ namespace NPOI.XSSF.Streaming
 			return fos;
 		}
 
-		/**
-		 * flush and close the temp data writer. 
-		 * This method <em>must</em> be invoked before calling {@link #getWorksheetXMLInputStream()}
-		 */
-		public void Close()
-		{
-			try
-			{
-				OutputStream.Flush();
-			}
-			catch (Exception e)
-			{
+        /**
+         * flush and close the temp data writer. 
+         * This method <em>must</em> be invoked before calling {@link #getWorksheetXMLInputStream()}
+         */
+        public void Close()
+        {
+            try
+            {
+                _outputWriter.Flush();
+                OutputStream.Flush();
+            }
+            catch (Exception)
+            {
 
-			}
-			try
-			{
-				OutputStream.Close();
-			}
-			catch (Exception e)
-			{
+            }
+            try
+            {
+                OutputStream.Close();
+            }
+            catch (Exception)
+            {
 
 			}
 
 
 		}
 
-		/**
-		 * @return a stream to read temp file with the sheet data
-		 */
-		public Stream GetWorksheetXmlInputStream()
-		{
-			Stream fis = new FileStream(TemporaryFileInfo.FullName, FileMode.OpenOrCreate, FileAccess.ReadWrite);
-			try
-			{
-				return DecorateInputStream(fis);
-			}
-			catch (IOException e)
-			{
-				fis.Close();
-				throw e;
-			}
-		}
+        public FileInfo TempFileInfo
+        {
+            get
+            {
+                return TemporaryFileInfo;
+            }
+        }
+        /**
+         * @return a stream to read temp file with the sheet data
+         */
+        public Stream GetWorksheetXmlInputStream()
+        {
+            Stream fis = new FileStream(TemporaryFileInfo.FullName, FileMode.OpenOrCreate, FileAccess.ReadWrite);
+            try
+            {
+                return DecorateInputStream(fis);
+            }
+            catch (IOException)
+            {
+                fis.Close();
+                throw;
+            }
+        }
 
 		/**
 		 * Override this to translate (such as decrypt or expand) the file input stream
@@ -168,413 +177,396 @@ namespace NPOI.XSSF.Streaming
 			return fis;
 		}
 
+        protected void FinalizeWriter()
+        {
+            TemporaryFileInfo.Delete();
+            if (File.Exists(TemporaryFileInfo.FullName))
+            {
+                logger.Log(POILogger.ERROR, "Can't delete temporary encryption file: " + TemporaryFileInfo);
+            }
+        }
 
+        /**
+         * Write a row to the file
+         *
+         * @param rownum 0-based row number
+         * @param row    a row
+         */
+        public void WriteRow(int rownum, SXSSFRow row)
+        {
+            BeginRow(rownum, row);
+            
+            using (var cells = row.AllCellsIterator())
+            {
+                int columnIndex = 0;
+                while (cells.MoveNext())
+                {
+                    WriteCell(columnIndex++, cells.Current);
+                }
+                EndRow();
+            }
+            
+            if (LowestIndexOfFlushedRows == -1 || LowestIndexOfFlushedRows > rownum)
+            {
+                LowestIndexOfFlushedRows = rownum;
+                NumberOfFlushedRows++;
+            }
+        }
 
-		protected void Finalize()
-		{
-			TemporaryFileInfo.Delete();
-			if (File.Exists(TemporaryFileInfo.FullName))
-			{
-				logger.Log(POILogger.ERROR, "Can't delete temporary encryption file: " + TemporaryFileInfo);
-			}
-		}
+        public void FlushRows(int rowCount, int lastRowNum, int lastRowCellsCount)
+        {
 
-		/**
-		 * Write a row to the file
-		 *
-		 * @param rownum 0-based row number
-		 * @param row    a row
-		 */
-		public void WriteRow(int rownum, IRow row)
-		{
-			if (NumberOfFlushedRows == 0)
-			{
-				LowestIndexOfFlushedRows = rownum;
-			}
+            NumberLastFlushedRow = Math.Max(lastRowNum, NumberLastFlushedRow);
+            NumberOfCellsOfLastFlushedRow = lastRowCellsCount;
 
-			NumberLastFlushedRow = Math.Max(rownum, NumberLastFlushedRow);
-			NumberOfCellsOfLastFlushedRow = row.LastCellNum;
-			NumberOfFlushedRows++;
-			BeginRow(rownum, row);
-			var cells = row.GetEnumerator();
-			while (cells.MoveNext())
-			{
-				WriteCell(cells.Current.ColumnIndex, cells.Current);
-			}
-			EndRow();
-		}
+            _outputWriter.Flush();
+            OutputStream.Flush();
+        }
 
-		private void BeginRow(int rownum, IRow row)
-		{
-			WriteAsBytes(OutputStream, "<row r=\"" + (rownum + 1) + "\"");
+        private void BeginRow(int rownum, SXSSFRow row)
+        {
+            WriteAsBytes("<row r=\"");
+            WriteAsBytes(rownum + 1);
+            WriteAsBytes("\"");
 
-			if (row.HasCustomHeight())
-			{
-				WriteAsBytes(OutputStream, " customHeight=\"true\"  ht=\"" + row.HeightInPoints + "\"");
+            if (row.HasCustomHeight())
+            {
+                WriteAsBytes(" customHeight=\"true\"  ht=\"");
+                WriteAsBytes(row.HeightInPoints);
+                WriteAsBytes("\"");
+            }
+            if (row.ZeroHeight)
+            {
+                WriteAsBytes(" hidden=\"true\"");
+            }
+            if (row.IsFormatted)
+            {
+                WriteAsBytes(" s=\"");
+                WriteAsBytes(row.RowStyle.Index);
+                WriteAsBytes("\"");
+                WriteAsBytes(" customFormat=\"1\"");
+            }
 
-			}
-			if (row.ZeroHeight)
-			{
-				WriteAsBytes(OutputStream, " hidden=\"true\"");
+            if (row.OutlineLevel != 0)
+            {
+                WriteAsBytes(" outlineLevel=\"");
+                WriteAsBytes(row.OutlineLevel);
+                WriteAsBytes("\"");
+            }
+            if (row.Hidden != null)
+            {
+                WriteAsBytes(" hidden=\"");
+                WriteAsBytes(row.Hidden.Value ? "1" : "0");
+                WriteAsBytes("\"");
+            }
+            if (row.Collapsed != null)
+            {
+                WriteAsBytes(" collapsed=\"");
+                WriteAsBytes(row.Collapsed.Value ? "1" : "0");
+                WriteAsBytes("\"");
+            }
 
-			}
-			if (row.IsFormatted)
-			{
-				WriteAsBytes(OutputStream, " s=\"" + row.RowStyle.Index + "\"");
+            WriteAsBytes(">\n");
 
-				WriteAsBytes(OutputStream, " customFormat=\"1\"");
+            RowNum = rownum;
+        }
 
-			}
+        private void EndRow()
+        {
+            WriteAsBytes("</row>\n");
+        }
 
-			if (row.OutlineLevel != 0)
-			{
-				WriteAsBytes(OutputStream, " outlineLevel=\"" + row.OutlineLevel + "\"");
+        public void WriteCell(int columnIndex, ICell cell)
+        {
+            if (cell == null)
+            {
+                return;
+            }
+            var cellRef = new CellReference(RowNum, columnIndex).FormatAsString();
+            WriteAsBytes("<c r=\"");
+            WriteAsBytes(cellRef);
+            WriteAsBytes("\"");
 
-			}
-			if (row.Hidden != null)
-			{
-				WriteAsBytes(OutputStream, " hidden=\"" + (row.Hidden.Value ? "1" : "0") + "\"");
-
-			}
-			if (row.Collapsed != null)
-			{
-				WriteAsBytes(OutputStream, " collapsed=\"" + (row.Collapsed.Value ? "1" : "0") + "\"");
-
-			}
-
-			WriteAsBytes(OutputStream, ">\n");
-
-			this.RowNum = rownum;
-		}
-
-		private void EndRow()
-		{
-			WriteAsBytes(OutputStream, "</row>\n");
-
-		}
-
-		public void WriteCell(int columnIndex, ICell cell)
-		{
-			if (cell == null)
-			{
-				return;
-			}
-			string cellRef = new CellReference(RowNum, columnIndex).FormatAsString();
-			WriteAsBytes(OutputStream, "<c r=\"" + cellRef + "\"");
-
-			if (cell.CellStyle.Index != 0)
-			{
-				// need to convert the short to unsigned short as the indexes can be up to 64k
-				// ideally we would use int for this index, but that would need changes to some more 
-				// APIs
-				WriteAsBytes(OutputStream, " s=\"" + (cell.CellStyle.Index & 0xffff) + "\"");
-			}
-			switch (cell.CellType)
-			{
-				case CellType.Blank:
-					{
-						WriteAsBytes(OutputStream, ">");
-						break;
-					}
-				case CellType.Formula:
-					{
-						WriteAsBytes(OutputStream, ">");
-						WriteAsBytes(OutputStream, "<f>");
+            if (cell.CellStyle.Index != 0)
+            {
+                // need to convert the short to unsigned short as the indexes can be up to 64k
+                // ideally we would use int for this index, but that would need changes to some more 
+                // APIs
+                WriteAsBytes(" s=\"");
+                WriteAsBytes(cell.CellStyle.Index & 0xffff);
+                WriteAsBytes("\"");
+            }
+            switch (cell.CellType)
+            {
+                case CellType.Blank:
+                    {
+                        WriteAsBytes(">");
+                        break;
+                    }
+                case CellType.Formula:
+                    {
+                        WriteAsBytes(">");
+                        WriteAsBytes("<f>");
 
 						OutputQuotedString(cell.CellFormula);
 
-						WriteAsBytes(OutputStream, "</f>");
+                        WriteAsBytes("</f>");
 
-						switch (cell.GetCachedFormulaResultTypeEnum())
-						{
-							case CellType.Numeric:
-								double nval = cell.NumericCellValue;
-								if (!Double.IsNaN(nval))
-								{
-									WriteAsBytes(OutputStream, "<v>" + nval + "</v>");
-								}
-								break;
-							default:
-								break;
-						}
-						break;
-					}
-				case CellType.String:
-					{
-						if (_sharedStringSource != null)
-						{
-							XSSFRichTextString rt = (XSSFRichTextString)cell.RichStringCellValue;
-							CT_Rst st = rt.GetCTRst();
-							rt.SetStylesTableReference(_stylesSource);
-							int sRef = _sharedStringSource.AddEntry(rt.GetCTRst());
-							if (st.r != null)
-							{
-								//WriteAsBytes(OutputStream, st.XmlText);
-								WriteAsBytes(OutputStream, " t=\"inlineStr\">");
-								WriteAsBytes(OutputStream, "<is>");
-								foreach (CT_RElt elt in st.r)
-								{
-									if (elt.rPr != null)
-									{
-										// the case of having font styles
-										WriteAsBytes(OutputStream, "<r>");
-										WriteAsBytes(OutputStream, "<rPr>");
-										if (elt.rPr.iSpecified)
-											WriteAsBytes(OutputStream, "<i/>");
-										if (elt.rPr.rFontSpecified)
-											WriteAsBytes(OutputStream, "<rFont val=\"" + elt.rPr.rFont.val + "\"/>");
-										if (elt.rPr.szSpecified)
-											WriteAsBytes(OutputStream, "<sz val=\"" + elt.rPr.sz.val + "\"/>");
-										if (elt.rPr.colorSpecified)
-											WriteAsBytes(OutputStream, "<color theme=\"" + elt.rPr.color.theme + "\"/>");
-										WriteAsBytes(OutputStream, "</rPr>");
-										WriteAsBytes(OutputStream, "<t");
-										if (HasLeadingTrailingSpaces(elt.t))
-										{
-											WriteAsBytes(OutputStream, " xml:space=\"preserve\"");
-										}
-										WriteAsBytes(OutputStream, ">");
-										OutputQuotedString(elt.t);
-										WriteAsBytes(OutputStream, "</t>");
-										WriteAsBytes(OutputStream, "</r>");
-									}
-									else
-									{
-										WriteAsBytes(OutputStream, "<r>");
-										WriteAsBytes(OutputStream, "<t");
-										if (HasLeadingTrailingSpaces(elt.t))
-										{
-											WriteAsBytes(OutputStream, " xml:space=\"preserve\"");
-										}
-										WriteAsBytes(OutputStream, ">");
-										OutputQuotedString(elt.t);
-										WriteAsBytes(OutputStream, "</t>");
-										WriteAsBytes(OutputStream, "</r>");
-									}
+                        switch (cell.GetCachedFormulaResultTypeEnum())
+                        {
+                            case CellType.Numeric:
+                                double nval = cell.NumericCellValue;
+                                if (!Double.IsNaN(nval))
+                                {
+                                    WriteAsBytes("<v>");
+                                    WriteAsBytes(nval);
+                                    WriteAsBytes("</v>");
+                                }
+                                break;
+                            default:
+                                break;
+                        }
+                        break;
+                    }
+                case CellType.String:
+                    {
+                        if (_sharedStringSource != null)
+                        {
+                            XSSFRichTextString rt = new XSSFRichTextString(cell.StringCellValue);
+                            int sRef = _sharedStringSource.AddEntry(rt.GetCTRst());
 
-								}
+                            WriteAsBytes(" t=\"");
+                            WriteAsBytes("s");
+                            WriteAsBytes("\">");
+                            WriteAsBytes("<v>");
+                            WriteAsBytes(sRef);
+                            WriteAsBytes("</v>");
+                        }
+                        else
+                        {
+                            WriteAsBytes(" t=\"inlineStr\">");
+                            WriteAsBytes("<is><t");
 
-								WriteAsBytes(OutputStream, "</is>");
-							}
-							else
-							{
-								WriteAsBytes(OutputStream, " t=\"" + ST_CellType.s + "\">");
-								WriteAsBytes(OutputStream, "<v>");
-								WriteAsBytes(OutputStream, sRef.ToString());
-								WriteAsBytes(OutputStream, "</v>");
-							}
-						}
-						else
-						{
-							WriteAsBytes(OutputStream, " t=\"inlineStr\">");
-							WriteAsBytes(OutputStream, "<is><t");
+                            if (HasLeadingTrailingSpaces(cell.StringCellValue))
+                            {
+                                WriteAsBytes(" xml:space=\"preserve\"");
+                            }
 
-							if (HasLeadingTrailingSpaces(cell.StringCellValue))
-							{
-								WriteAsBytes(OutputStream, " xml:space=\"preserve\"");
-							}
-
-							WriteAsBytes(OutputStream, ">");
+                            WriteAsBytes(">");
 
 							OutputQuotedString(cell.StringCellValue);
 
-							WriteAsBytes(OutputStream, "</t></is>");
-						}
-						break;
-					}
-				case CellType.Numeric:
-					{
-						WriteAsBytes(OutputStream, " t=\"n\">");
-						WriteAsBytes(OutputStream, "<v>" + cell.NumericCellValue + "</v>");
-						break;
-					}
-				case CellType.Boolean:
-					{
-						WriteAsBytes(OutputStream, " t=\"b\">");
-						WriteAsBytes(OutputStream, "<v>" + (cell.BooleanCellValue ? "1" : "0") + "</v>");
-						break;
-					}
-				case CellType.Error:
-					{
-						FormulaError error = FormulaError.ForInt(cell.ErrorCellValue);
+                            WriteAsBytes("</t></is>");
+                        }
+                        break;
+                    }
+                case CellType.Numeric:
+                    {
+                        WriteAsBytes(" t=\"n\">");
+                        WriteAsBytes("<v>");
+                        WriteAsBytes(cell.NumericCellValue);
+                        WriteAsBytes("</v>");
+                        break;
+                    }
+                case CellType.Boolean:
+                    {
+                        WriteAsBytes(" t=\"b\">");
+                        WriteAsBytes("<v>");
+                        WriteAsBytes(cell.BooleanCellValue ? "1" : "0");
+                        WriteAsBytes("</v>");
+                        break;
+                    }
+                case CellType.Error:
+                    {
+                        FormulaError error = FormulaError.ForInt(cell.ErrorCellValue);
 
-						WriteAsBytes(OutputStream, " t=\"e\">");
-						WriteAsBytes(OutputStream, "<v>" + error.String + "</v>");
-						break;
-					}
-				default:
-					{
-						throw new InvalidOperationException("Invalid cell type: " + cell.CellType);
-					}
-			}
-			WriteAsBytes(OutputStream, "</c>");
-			OutputStream.Flush();
-		}
+                        WriteAsBytes(" t=\"e\">");
+                        WriteAsBytes("<v>");
+                        WriteAsBytes(error.String);
+                        WriteAsBytes("</v>");
+                        break;
+                    }
+                default:
+                    {
+                        throw new InvalidOperationException("Invalid cell type: " + cell.CellType);
+                    }
+            }
+            WriteAsBytes("</c>");
+        }
 
-		private void WriteAsBytes(Stream outStream, string text)
-		{
-			var bytes = Encoding.UTF8.GetBytes(text);
-			outStream.Write(bytes, 0, bytes.Length);
-		}
+        private void WriteAsBytes(string text)
+        {
+            _outputWriter.Write(text);
+        }
 
-		private void WriteAsBytes(Stream outStream, char[] chars)
-		{
-			var bytes = Encoding.UTF8.GetBytes(chars);
-			outStream.Write(bytes, 0, bytes.Length);
-		}
-		/**
-		 * @return  whether the string has leading / trailing spaces that
-		 *  need to be preserved with the xml:space=\"preserve\" attribute
-		 */
-		private bool HasLeadingTrailingSpaces(string str)
-		{
-			if (str != null && str.Length > 0)
-			{
-				char firstChar = str[0];
-				char lastChar = str[str.Length - 1];
-				return Character.isWhitespace(firstChar) || Character.isWhitespace(lastChar);
-			}
-			return false;
-		}
+        private void WriteAsBytes(ArraySegment<char> chars)
+        {
+            _outputWriter.Write(chars.Array, chars.Offset, chars.Count);
+        }
 
-		//Taken from jdk1.3/src/javax/swing/text/html/HTMLWriter.java
-		protected void OutputQuotedString(String s)
-		{
-			if (s == null || s.Length == 0)
-			{
-				return;
-			}
+        private void WriteAsBytes(int value)
+        {
+            _outputWriter.Write(value);
+        }
 
-			char[] chars = s.ToCharArray();
-			int last = 0;
-			int length = s.Length;
-			for (int counter = 0; counter < length; counter++)
-			{
-				char c = chars[counter];
-				switch (c)
-				{
-					case '<':
-						if (counter > last)
-						{
-							WriteAsBytes(OutputStream, GetSubArray(chars, last, counter - last));
-						}
-						last = counter + 1;
+        private void WriteAsBytes(float value)
+        {
+            _outputWriter.Write(value.ToString(CultureInfo.InvariantCulture));
+        }
 
-						WriteAsBytes(OutputStream, "&lt;".ToCharArray());
-						break;
-					case '>':
-						if (counter > last)
-						{
-							WriteAsBytes(OutputStream, GetSubArray(chars, last, counter - last));
-						}
-						last = counter + 1;
-						WriteAsBytes(OutputStream, "&gt;".ToCharArray());
-						break;
-					case '&':
-						if (counter > last)
-						{
-							WriteAsBytes(OutputStream, GetSubArray(chars, last, counter - last));
-						}
-						last = counter + 1;
-						WriteAsBytes(OutputStream, "&amp;".ToCharArray());
-						break;
-					case '"':
-						if (counter > last)
-						{
-							WriteAsBytes(OutputStream, GetSubArray(chars, last, counter - last));
-						}
-						last = counter + 1;
-						WriteAsBytes(OutputStream, "&quot;".ToCharArray());
-						break;
-					// Special characters
-					case '\n':
-					case '\r':
-						if (counter > 0 && chars[counter - 1] != '\r')
-						{
-							if (counter > last)
-							{
-								WriteAsBytes(OutputStream, GetSubArray(chars, last, counter - last));
-							}
-							WriteAsBytes(OutputStream, "&#xa;".ToCharArray());
-						}
-						last = counter + 1;
-						break;
-					case '\t':
-						if (counter > last)
-						{
-							WriteAsBytes(OutputStream, GetSubArray(chars, last, counter - last));
-						}
-						WriteAsBytes(OutputStream, "&#x9;".ToCharArray());
-						last = counter + 1;
-						break;
-					case (char)0xa0:
-						if (counter > last)
-						{
-							WriteAsBytes(OutputStream, GetSubArray(chars, last, counter - last));
-						}
-						WriteAsBytes(OutputStream, "&#xa0;".ToCharArray());
-						last = counter + 1;
-						break;
-					default:
-						// YK: XmlBeans silently replaces all ISO control characters ( < 32) with question marks.
-						// the same rule applies to unicode surrogates and "not a character" symbols.
-						if (c < ' ' || Char.IsLowSurrogate(c) || Char.IsHighSurrogate(c) ||
-								('\uFFFE' <= c && c <= '\uFFFF'))
-						{
-							if (counter > last)
-							{
-								WriteAsBytes(OutputStream, GetSubArray(chars, last, counter - last));
-							}
-							WriteAsBytes(OutputStream, "?");
-							last = counter + 1;
-						}
-						else if (c > 127)
-						{
-							if (counter > last)
-							{
-								WriteAsBytes(OutputStream, GetSubArray(chars, last, counter - last));
-							}
-							last = counter + 1;
-							// If the character is outside of UTF8, write the
-							// numeric value.
-							WriteAsBytes(OutputStream, "&#".ToCharArray());
-							WriteAsBytes(OutputStream, ((int)c).ToString());
-							WriteAsBytes(OutputStream, ";");
-						}
-						break;
-				}
-			}
-			if (last < length)
-			{
-				WriteAsBytes(OutputStream, GetSubArray(chars, last, length - last));
-			}
-		}
+        private void WriteAsBytes(double value)
+        {
+            _outputWriter.Write(value.ToString(CultureInfo.InvariantCulture));
+        }
 
-		private char[] GetSubArray(char[] oldArray, int skip, int take)
-		{
-			var sub = new char[take];
-			Array.Copy(oldArray, skip, sub, 0, take);
-			return sub;
-		}
+        /**
+         * @return  whether the string has leading / trailing spaces that
+         *  need to be preserved with the xml:space=\"preserve\" attribute
+         */
+        private bool HasLeadingTrailingSpaces(string str)
+        {
+            if (!string.IsNullOrEmpty(str))
+            {
+                char firstChar = str[0];
+                char lastChar = str[str.Length - 1];
+                return Character.isWhitespace(firstChar) || Character.isWhitespace(lastChar);
+            }
+            return false;
+        }
 
-		/**
-		 * Deletes the temporary file that backed this sheet on disk.
-		 * @return true if the file was deleted, false if it wasn't.
-		 */
-		public bool Dispose()
-		{
-			bool ret;
-			try
-			{
-				OutputStream.Close();
-			}
-			finally
-			{
-				TemporaryFileInfo.Delete();
-				ret = File.Exists(TemporaryFileInfo.FullName);
-			}
-			return ret;
-		}
+        //Taken from jdk1.3/src/javax/swing/text/html/HTMLWriter.java
+        protected void OutputQuotedString(string s)
+        {
+            if (string.IsNullOrEmpty(s))
+            {
+                return;
+            }
+
+            char[] chars = s.ToCharArray();
+            int last = 0;
+            int length = s.Length;
+            for (int counter = 0; counter < length; counter++)
+            {
+                char c = chars[counter];
+                switch (c)
+                {
+                    case '<':
+                        if (counter > last)
+                        {
+                            WriteAsBytes(GetSubArray(chars, last, counter - last));
+                        }
+                        last = counter + 1;
+
+                        WriteAsBytes("&lt;");
+                        break;
+                    case '>':
+                        if (counter > last)
+                        {
+                            WriteAsBytes(GetSubArray(chars, last, counter - last));
+                        }
+                        last = counter + 1;
+                        WriteAsBytes("&gt;");
+                        break;
+                    case '&':
+                        if (counter > last)
+                        {
+                            WriteAsBytes(GetSubArray(chars, last, counter - last));
+                        }
+                        last = counter + 1;
+                        WriteAsBytes("&amp;");
+                        break;
+                    case '"':
+                        if (counter > last)
+                        {
+                            WriteAsBytes(GetSubArray(chars, last, counter - last));
+                        }
+                        last = counter + 1;
+                        WriteAsBytes("&quot;");
+                        break;
+                    // Special characters
+                    case '\n':
+                    case '\r':
+                        if (counter > last)
+                        {
+                            WriteAsBytes(GetSubArray(chars, last, counter - last));
+                        }
+                        WriteAsBytes("&#xa;");
+                        last = counter + 1;
+                        break;
+                    case '\t':
+                        if (counter > last)
+                        {
+                            WriteAsBytes(GetSubArray(chars, last, counter - last));
+                        }
+                        WriteAsBytes("&#x9;");
+                        last = counter + 1;
+                        break;
+                    case (char)0xa0:
+                        if (counter > last)
+                        {
+                            WriteAsBytes(GetSubArray(chars, last, counter - last));
+                        }
+                        WriteAsBytes("&#xa0;");
+                        last = counter + 1;
+                        break;
+                    default:
+                        // YK: XmlBeans silently replaces all ISO control characters ( < 32) with question marks.
+                        // the same rule applies to unicode surrogates and "not a character" symbols.
+                        if (c < ' ' || Char.IsLowSurrogate(c) || Char.IsHighSurrogate(c) || '\uFFFE' <= c)
+                        {
+                            if (counter > last)
+                            {
+                                WriteAsBytes(GetSubArray(chars, last, counter - last));
+                            }
+                            WriteAsBytes("?");
+                            last = counter + 1;
+                        }
+                        else if (c > 127)
+                        {
+                            if (counter > last)
+                            {
+                                WriteAsBytes(GetSubArray(chars, last, counter - last));
+                            }
+                            last = counter + 1;
+                            // If the character is outside of UTF8, write the
+                            // numeric value.
+                            WriteAsBytes("&#");
+                            WriteAsBytes(c);
+                            WriteAsBytes(";");
+                        }
+                        break;
+                }
+            }
+            if (last < length)
+            {
+                WriteAsBytes(GetSubArray(chars, last, length - last));
+            }
+        }
+
+        private static ArraySegment<char> GetSubArray(char[] oldArray, int skip, int take)
+        {
+            return new ArraySegment<char>(oldArray, skip, take);
+        }
+
+        /**
+         * Deletes the temporary file that backed this sheet on disk.
+         * @return true if the file was deleted, false if it wasn't.
+         */
+        public bool Dispose()
+        {
+            bool ret;
+            try
+            {
+                OutputStream.Close();
+            }
+            finally
+            {
+                TemporaryFileInfo.Delete();
+                ret = !File.Exists(TemporaryFileInfo.FullName);
+                TemporaryFileInfo.Refresh();
+            }
+            return ret;
+        }
 
 		public string TemporaryFilePath()
 		{

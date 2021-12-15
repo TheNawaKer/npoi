@@ -155,40 +155,39 @@ namespace NPOI.SS.Util
 				}
 			}
 
-			// If there are are any merged regions in the source row, copy to new row
-			for (int i = 0; i < sourceSheet.NumMergedRegions; i++)
-			{
-				CellRangeAddress cellRangeAddress = sourceSheet.GetMergedRegion(i);
-				if (cellRangeAddress.FirstRow == sourceRow.RowNum)
-				{
-					CellRangeAddress newCellRangeAddress = new CellRangeAddress(newRow.RowNum,
-							(newRow.RowNum +
-									(cellRangeAddress.LastRow - cellRangeAddress.FirstRow
-											)),
-							cellRangeAddress.FirstColumn,
-							cellRangeAddress.LastColumn);
-					targetSheet.AddMergedRegion(newCellRangeAddress);
-				}
-			}
-			return newRow;
-		}
-		public static IRow CopyRow(ISheet sheet, int sourceRowIndex, int targetRowIndex)
-		{
-			if (sourceRowIndex == targetRowIndex)
-				throw new ArgumentException("sourceIndex and targetIndex cannot be same");
-			// Get the source / new row
-			IRow newRow = sheet.GetRow(targetRowIndex);
-			IRow sourceRow = sheet.GetRow(sourceRowIndex);
+            // If there are are any merged regions in the source row, copy to new row
+            for (int i = 0; i < sourceSheet.NumMergedRegions; i++)
+            {
+                CellRangeAddress cellRangeAddress = sourceSheet.GetMergedRegion(i);
+                
+                if (cellRangeAddress!=null && cellRangeAddress.FirstRow == sourceRow.RowNum)
+                {
+                    CellRangeAddress newCellRangeAddress = new CellRangeAddress(newRow.RowNum,
+                            (newRow.RowNum +
+                                    (cellRangeAddress.LastRow - cellRangeAddress.FirstRow
+                                            )),
+                            cellRangeAddress.FirstColumn,
+                            cellRangeAddress.LastColumn);
+                    targetSheet.AddMergedRegion(newCellRangeAddress);
+                }
+            }
+            return newRow;           
+        }
+        public static IRow CopyRow(ISheet sheet, int sourceRowIndex, int targetRowIndex)
+        {
+            if (sourceRowIndex == targetRowIndex)
+                throw new ArgumentException("sourceIndex and targetIndex cannot be same");
+            // Get the source / new row
+            IRow newRow = sheet.GetRow(targetRowIndex);
+            IRow sourceRow = sheet.GetRow(sourceRowIndex);
 
-			// If the row exist in destination, push down all rows by 1 else create a new row
-			if (newRow != null)
-			{
-				sheet.ShiftRows(targetRowIndex, sheet.LastRowNum, 1);
-			}
-			else
-			{
-				newRow = sheet.CreateRow(targetRowIndex);
-			}
+            // If the row exist in destination, push down all rows by 1 else create a new row
+            if (newRow != null)
+            {
+                sheet.ShiftRows(targetRowIndex, sheet.LastRowNum, 1);
+            }
+            newRow = sheet.CreateRow(targetRowIndex);
+            newRow.Height = sourceRow.Height;   //copy row height
 
 			// Loop through source columns to add to new row
 			for (int i = sourceRow.FirstCellNum; i < sourceRow.LastCellNum; i++)
@@ -248,40 +247,40 @@ namespace NPOI.SS.Util
 				}
 			}
 
-			// If there are are any merged regions in the source row, copy to new row
-			for (int i = 0; i < sheet.NumMergedRegions; i++)
-			{
-				CellRangeAddress cellRangeAddress = sheet.GetMergedRegion(i);
-				if (cellRangeAddress.FirstRow == sourceRow.RowNum)
-				{
-					CellRangeAddress newCellRangeAddress = new CellRangeAddress(newRow.RowNum,
-							(newRow.RowNum +
-									(cellRangeAddress.LastRow - cellRangeAddress.FirstRow
-											)),
-							cellRangeAddress.FirstColumn,
-							cellRangeAddress.LastColumn);
-					sheet.AddMergedRegion(newCellRangeAddress);
-				}
-			}
-			return newRow;
-		}
+            // If there are are any merged regions in the source row, copy to new row
+            for (int i = 0; i < sheet.NumMergedRegions; i++)
+            {
+                CellRangeAddress cellRangeAddress = sheet.GetMergedRegion(i);
+                if (cellRangeAddress != null && cellRangeAddress.FirstRow == sourceRow.RowNum)
+                {
+                    CellRangeAddress newCellRangeAddress = new CellRangeAddress(newRow.RowNum,
+                            (newRow.RowNum +
+                                    (cellRangeAddress.LastRow - cellRangeAddress.FirstRow
+                                            )),
+                            cellRangeAddress.FirstColumn,
+                            cellRangeAddress.LastColumn);
+                    sheet.AddMergedRegion(newCellRangeAddress);
+                }
+            }
+            return newRow;
+        }
 
 
-		/**
-		 * Compute width of a single cell
-		 *
-		 * @param cell the cell whose width is to be calculated
-		 * @param defaultCharWidth the width of a single character
-		 * @param formatter formatter used to prepare the text to be measured
-		 * @param useMergedCells    whether to use merged cells
-		 * @return  the width in pixels
-		 */
-		public static double GetCellWidth(ICell cell, int defaultCharWidth, DataFormatter formatter, bool useMergedCells)
-		{
-			ISheet sheet = cell.Sheet;
-			IWorkbook wb = sheet.Workbook;
-			IRow row = cell.Row;
-			int column = cell.ColumnIndex;
+        /**
+         * Compute width of a single cell
+         *
+         * @param cell the cell whose width is to be calculated
+         * @param defaultCharWidth the width of a single character
+         * @param formatter formatter used to prepare the text to be measured
+         * @param useMergedCells    whether to use merged cells
+         * @return  the width in pixels or -1 if cell is empty
+         */
+        public static double GetCellWidth(ICell cell, int defaultCharWidth, DataFormatter formatter, bool useMergedCells)
+        {
+            ISheet sheet = cell.Sheet;
+            IWorkbook wb = sheet.Workbook;
+            IRow row = cell.Row;
+            int column = cell.ColumnIndex;
 
 			int colspan = 1;
 			for (int i = 0; i < sheet.NumMergedRegions; i++)
@@ -323,249 +322,245 @@ namespace NPOI.SS.Util
 					{
 						String txt = lines[i] + defaultChar;
 
-						//str = new AttributedString(txt);
-						//copyAttributes(font, str, 0, txt.length());
-						windowsFont = IFont2Font(font);
-						if (rt.NumFormattingRuns > 0)
-						{
-							// TODO: support rich text fragments
-						}
+                        //AttributedString str = new AttributedString(txt);
+                        //copyAttributes(font, str, 0, txt.length());
+                        windowsFont = IFont2Font(font);
+                        if (rt.NumFormattingRuns > 0)
+                        {
+                            // TODO: support rich text fragments
+                        }
 
-						//layout = new TextLayout(str.getIterator(), fontRenderContext);
-						if (style.Rotation != 0)
-						{
-							/*
-							 * Transform the text using a scale so that it's height is increased by a multiple of the leading,
-							 * and then rotate the text before computing the bounds. The scale results in some whitespace around
-							 * the unrotated top and bottom of the text that normally wouldn't be present if unscaled, but
-							 * is added by the standard Excel autosize.
-							 */
-							//AffineTransform trans = new AffineTransform();
-							//trans.concatenate(AffineTransform.getRotateInstance(style.Rotation*2.0*Math.PI/360.0));
-							//trans.concatenate(
-							//    AffineTransform.getScaleInstance(1, fontHeightMultiple)
-							//    );
-							double angle = style.Rotation * 2.0 * Math.PI / 360.0;
-							SizeF sf = g.MeasureString(txt, windowsFont);
-							double x1 = Math.Abs(sf.Height * Math.Sin(angle));
-							double x2 = Math.Abs(sf.Width * Math.Cos(angle));
-							double w = Math.Round(x1 + x2, 0, MidpointRounding.ToEven);
-							width = Math.Max(width, (w / colspan / defaultCharWidth) * 2 + cell.CellStyle.Indention);
-							//width = Math.Max(width,
-							//                 ((layout.getOutline(trans).getBounds().getWidth()/colspan)/defaultCharWidth) +
-							//                 cell.getCellStyle().getIndention());
-						}
-						else
-						{
-							//width = Math.Max(width,
-							//                 ((layout.getBounds().getWidth()/colspan)/defaultCharWidth) +
-							//                 cell.getCellStyle().getIndention());
-							double w = Math.Round(g.MeasureString(txt, windowsFont).Width, 0, MidpointRounding.ToEven);
-							//1 is margin 
-							width = Math.Max(width, (w / colspan / defaultCharWidth) * 2 + cell.CellStyle.Indention);
-						}
-					}
-				}
-				else
-				{
-					String sval = null;
-					if (cellType == CellType.Numeric)
-					{
-						// Try to get it formatted to look the same as excel
-						try
-						{
-							sval = formatter.FormatCellValue(cell, dummyEvaluator);
-						}
-						catch (Exception)
-						{
-							sval = cell.NumericCellValue.ToString();
-						}
-					}
-					else if (cellType == CellType.Boolean)
-					{
-						sval = cell.BooleanCellValue.ToString().ToUpper();
-					}
-					if (sval != null)
-					{
-						String txt = sval + defaultChar;
-						//str = new AttributedString(txt);
-						//copyAttributes(font, str, 0, txt.length());
-						windowsFont = IFont2Font(font);
-						//layout = new TextLayout(str.getIterator(), fontRenderContext);
-						if (style.Rotation != 0)
-						{
-							/*
-							 * Transform the text using a scale so that it's height is increased by a multiple of the leading,
-							 * and then rotate the text before computing the bounds. The scale results in some whitespace around
-							 * the unrotated top and bottom of the text that normally wouldn't be present if unscaled, but
-							 * is added by the standard Excel autosize.
-							 */
-							//AffineTransform trans = new AffineTransform();
-							//trans.concatenate(AffineTransform.getRotateInstance(style.getRotation()*2.0*Math.PI/360.0));
-							//trans.concatenate(
-							//    AffineTransform.getScaleInstance(1, fontHeightMultiple)
-							//    );
-							//width = Math.max(width,
-							//                 ((layout.getOutline(trans).getBounds().getWidth()/colspan)/defaultCharWidth) +
-							//                 cell.getCellStyle().getIndention());
-							double angle = style.Rotation * 2.0 * Math.PI / 360.0;
-							SizeF sf = g.MeasureString(txt, windowsFont);
-							double x1 = sf.Height * Math.Sin(angle);
-							double x2 = sf.Width * Math.Cos(angle);
-							double w = Math.Round(x1 + x2, 0, MidpointRounding.ToEven);
-							width = Math.Max(width, (w / colspan / defaultCharWidth) * 2 + cell.CellStyle.Indention);
-						}
-						else
-						{
-							//width = Math.max(width,
-							//                 ((layout.getBounds().getWidth()/colspan)/defaultCharWidth) +
-							//                 cell.getCellStyle().getIndention());
-							double w = Math.Round(g.MeasureString(txt, windowsFont).Width, 0, MidpointRounding.ToEven);
-							width = Math.Max(width, (w * 1.0 / colspan / defaultCharWidth) * 2 + cell.CellStyle.Indention);
-						}
-					}
-				}
-			}
-			return width;
-		}
+                        width = GetCellWidth(defaultCharWidth, colspan, style, width, txt, g, windowsFont, cell);
+                    }
+                }
+                else
+                {
+                    String sval = null;
+                    if (cellType == CellType.Numeric)
+                    {
+                        // Try to get it formatted to look the same as excel
+                        try
+                        {
+                            sval = formatter.FormatCellValue(cell, dummyEvaluator);
+                        }
+                        catch (Exception)
+                        {
+                            sval = cell.NumericCellValue.ToString();
+                        }
+                    }
+                    else if (cellType == CellType.Boolean)
+                    {
+                        sval = cell.BooleanCellValue.ToString().ToUpper();
+                    }
+                    if (sval != null)
+                    {
+                        String txt = sval + defaultChar;
+                        //str = new AttributedString(txt);
+                        //copyAttributes(font, str, 0, txt.length());
+                        windowsFont = IFont2Font(font);
+                        width = GetCellWidth(defaultCharWidth, colspan, style, width, txt, g, windowsFont, cell);
+                    }
+                }
+            }
+            return width;
+        }
 
+        private static double GetCellWidth(int defaultCharWidth, int colspan,
+            ICellStyle style, double width, string str, Graphics g, Font windowsFont, ICell cell)
+        {
+            //Rectangle bounds;
+            double actualWidth;
+            if (style.Rotation != 0)
+            {
+                double angle = style.Rotation * 2.0 * Math.PI / 360.0;
+                SizeF sf = g.MeasureString(str, windowsFont);
+                double x1 = Math.Abs(sf.Height * Math.Sin(angle));
+                double x2 = Math.Abs(sf.Width * Math.Cos(angle));
+                actualWidth = Math.Round(x1 + x2, 0, MidpointRounding.ToEven);
+                //bounds = layout.getOutline(trans).getBounds();
+            }
+            else
+            {
+                //bounds = layout.getBounds();
+                actualWidth = Math.Round(g.MeasureString(str, windowsFont, int.MaxValue, StringFormat.GenericTypographic).Width, 0, MidpointRounding.ToEven);                
+            }
+            // entireWidth accounts for leading spaces which is excluded from bounds.getWidth()
+            //double frameWidth = bounds.getX() + bounds.getWidth();
+            //width = Math.max(width, ((frameWidth / colspan) / defaultCharWidth) + style.getIndention());
+            width = Math.Max(width, (actualWidth / colspan / defaultCharWidth) + cell.CellStyle.Indention);
+            return width;
+        }
+        // /**
+        // * Drawing context to measure text
+        // */
+        //private static FontRenderContext fontRenderContext = new FontRenderContext(null, true, true);
 
-		// /**
-		// * Drawing context to measure text
-		// */
-		//private static FontRenderContext fontRenderContext = new FontRenderContext(null, true, true);
+        /**
+         * Compute width of a column and return the result
+         *
+         * @param sheet the sheet to calculate
+         * @param column    0-based index of the column
+         * @param useMergedCells    whether to use merged cells
+         * @return  the width in pixels or -1 if all cells are empty
+         */
+        public static double GetColumnWidth(ISheet sheet, int column, bool useMergedCells)
+        {
+            return GetColumnWidth(sheet, column, useMergedCells, sheet.FirstRowNum, sheet.LastRowNum);
+        }
+        /**
+         * Compute width of a column based on a subset of the rows and return the result
+         *
+         * @param sheet the sheet to calculate
+         * @param column    0-based index of the column
+         * @param useMergedCells    whether to use merged cells
+         * @param firstRow  0-based index of the first row to consider (inclusive)
+         * @param lastRow   0-based index of the last row to consider (inclusive)
+         * @return  the width in pixels or -1 if cell is empty
+         */
+        public static double GetColumnWidth(ISheet sheet, int column, bool useMergedCells, int firstRow, int lastRow)
+        {
+            DataFormatter formatter = new DataFormatter();
+            int defaultCharWidth = GetDefaultCharWidth(sheet.Workbook);
 
-		/**
-		 * Compute width of a column and return the result
-		 *
-		 * @param sheet the sheet to calculate
-		 * @param column    0-based index of the column
-		 * @param useMergedCells    whether to use merged cells
-		 * @return  the width in pixels
-		 */
+            double width = -1;
+            for (int rowIdx = firstRow; rowIdx <= lastRow; ++rowIdx)
+            {
+                IRow row = sheet.GetRow(rowIdx);
+                if (row != null)
+                {
+                    double cellWidth = GetColumnWidthForRow(row, column, defaultCharWidth, formatter, useMergedCells);
+                    width = Math.Max(width, cellWidth);
+                }
+            }
+            return width;
+        }
 
-		public static double GetColumnWidth(ISheet sheet, int column, bool useMergedCells)
-		{
-			//AttributedString str;
-			//TextLayout layout;
+        /**
+         * Get default character width
+         *
+         * @param wb the workbook to get the default character width from
+         * @return default character width
+         */
+        public static int GetDefaultCharWidth(IWorkbook wb)
+        {
+            IFont defaultFont = wb.GetFontAt((short)0);
 
-			IWorkbook wb = sheet.Workbook;
-			DataFormatter formatter = new DataFormatter();
-			IFont defaultFont = wb.GetFontAt((short)0);
+            //AttributedString str = new AttributedString(String.valueOf(defaultChar));
+            //copyAttributes(defaultFont, str, 0, 1);
+            //TextLayout layout = new TextLayout(str.getIterator(), fontRenderContext);
+            //int defaultCharWidth = (int)layout.getAdvance();
+            int defaultCharWidth = 0;
+            Font font = IFont2Font(defaultFont);
+            using (var image = new Bitmap(1, 1))
+            {
+                using (var g = Graphics.FromImage(image))
+                {
+                    g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAlias;
+                    defaultCharWidth = (int)g.MeasureString(new String(defaultChar, 1), font, int.MaxValue, StringFormat.GenericTypographic).Width;
+                }
+            }
+            return defaultCharWidth;
+        }
 
-			//str = new AttributedString((defaultChar));
-			//copyAttributes(defaultFont, str, 0, 1);
-			//layout = new TextLayout(str.Iterator, fontRenderContext);
-			//int defaultCharWidth = (int)layout.Advance;
-			Font font = IFont2Font(defaultFont);
-			int defaultCharWidth = TextRenderer.MeasureText("" + new String(defaultChar, 1), font).Width;
-			//DummyEvaluator dummyEvaluator = new DummyEvaluator();
+        /**
+         * Compute width of a single cell in a row
+         * Convenience method for {@link getCellWidth}
+         *
+         * @param row the row that contains the cell of interest
+         * @param column the column number of the cell whose width is to be calculated
+         * @param defaultCharWidth the width of a single character
+         * @param formatter formatter used to prepare the text to be measured
+         * @param useMergedCells    whether to use merged cells
+         * @return  the width in pixels or -1 if cell is empty
+         */
+        private static double GetColumnWidthForRow(
+                IRow row, int column, int defaultCharWidth, DataFormatter formatter, bool useMergedCells)
+        {
+            if (row == null)
+            {
+                return -1;
+            }
 
-			double width = -1;
-			foreach (IRow row in sheet)
-			{
-				ICell cell = row.GetCell(column);
+            ICell cell = row.GetCell(column);
 
-				if (cell == null)
-				{
-					continue;
-				}
+            if (cell == null)
+            {
+                return -1;
+            }
 
-				double cellWidth = GetCellWidth(cell, defaultCharWidth, formatter, useMergedCells);
-				width = Math.Max(width, cellWidth);
-			}
-			return width;
-		}
+            return GetCellWidth(cell, defaultCharWidth, formatter, useMergedCells);
+        }
 
+        /**
+         * Check if the Fonts are installed correctly so that Java can compute the size of
+         * columns. 
+         * 
+         * If a Cell uses a Font which is not available on the operating system then Java may 
+         * fail to return useful Font metrics and thus lead to an auto-computed size of 0.
+         * 
+         *  This method allows to check if computing the sizes for a given Font will succeed or not.
+         *
+         * @param font The Font that is used in the Cell
+         * @return true if computing the size for this Font will succeed, false otherwise
+         */
+        public static bool CanComputeColumnWidth(IFont font)
+        {
+            //AttributedString str = new AttributedString("1w");
+            //copyAttributes(font, str, 0, "1w".length());
 
-		/**
-		 * Compute width of a column based on a subset of the rows and return the result
-		 *
-		 * @param sheet the sheet to calculate
-		 * @param column    0-based index of the column
-		 * @param useMergedCells    whether to use merged cells
-		 * @param firstRow  0-based index of the first row to consider (inclusive)
-		 * @param lastRow   0-based index of the last row to consider (inclusive)
-		 * @return  the width in pixels
-		 */
-		public static double GetColumnWidth(ISheet sheet, int column, bool useMergedCells, int firstRow, int lastRow)
-		{
-			IWorkbook wb = sheet.Workbook;
-			DataFormatter formatter = new DataFormatter();
+            //TextLayout layout = new TextLayout(str.getIterator(), fontRenderContext);
+            //if (layout.getBounds().getWidth() > 0)
+            //{
+            //    return true;
+            //}
 
-			IFont defaultFont = wb.GetFontAt((short)0);
+            return true;
+        }
+        // /**
+        // * Copy text attributes from the supplied Font to Java2D AttributedString
+        // */
+        //private static void copyAttributes(IFont font, AttributedString str, int startIdx, int endIdx)
+        //{
+        //    str.AddAttribute(TextAttribute.FAMILY, font.FontName, startIdx, endIdx);
+        //    str.AddAttribute(TextAttribute.SIZE, (float)font.FontHeightInPoints);
+        //    if (font.Boldweight == (short)FontBoldWeight.BOLD) str.AddAttribute(TextAttribute.WEIGHT, TextAttribute.WEIGHT_BOLD, startIdx, endIdx);
+        //    if (font.IsItalic) str.AddAttribute(TextAttribute.POSTURE, TextAttribute.POSTURE_OBLIQUE, startIdx, endIdx);
+        //    if (font.Underline == (byte)FontUnderlineType.SINGLE) str.AddAttribute(TextAttribute.UNDERLINE, TextAttribute.UNDERLINE_ON, startIdx, endIdx);           
+        //}
 
-			//str = new AttributedString((defaultChar));
-			//copyAttributes(defaultFont, str, 0, 1);
-			//layout = new TextLayout(str.Iterator, fontRenderContext);
-			//int defaultCharWidth = (int)layout.Advance;
-			Font font = IFont2Font(defaultFont);
-			int defaultCharWidth = TextRenderer.MeasureText("" + new String(defaultChar, 1), font).Width;
-
-			double width = -1;
-			for (int rowIdx = firstRow; rowIdx <= lastRow; ++rowIdx)
-			{
-				IRow row = sheet.GetRow(rowIdx);
-				if (row != null)
-				{
-
-					ICell cell = row.GetCell(column);
-
-					if (cell == null)
-					{
-						continue;
-					}
-
-					double cellWidth = GetCellWidth(cell, defaultCharWidth, formatter, useMergedCells);
-					width = Math.Max(width, cellWidth);
-				}
-			}
-			return width;
-		}
-
-		// /**
-		// * Copy text attributes from the supplied Font to Java2D AttributedString
-		// */
-		//private static void copyAttributes(IFont font, AttributedString str, int startIdx, int endIdx)
-		//{
-		//    str.AddAttribute(TextAttribute.FAMILY, font.FontName, startIdx, endIdx);
-		//    str.AddAttribute(TextAttribute.SIZE, (float)font.FontHeightInPoints);
-		//    if (font.Boldweight == (short)FontBoldWeight.BOLD) str.AddAttribute(TextAttribute.WEIGHT, TextAttribute.WEIGHT_BOLD, startIdx, endIdx);
-		//    if (font.IsItalic) str.AddAttribute(TextAttribute.POSTURE, TextAttribute.POSTURE_OBLIQUE, startIdx, endIdx);
-		//    if (font.Underline == (byte)FontUnderlineType.SINGLE) str.AddAttribute(TextAttribute.UNDERLINE, TextAttribute.UNDERLINE_ON, startIdx, endIdx);           
-		//}
-
-		/// <summary>
-		/// Convert HSSFFont to Font.
-		/// </summary>
-		/// <param name="font1">The font.</param>
-		/// <returns></returns>
-		internal static Font IFont2Font(IFont font1)
-		{
-			FontStyle style = FontStyle.Regular;
-			if (font1.Boldweight == (short)FontBoldWeight.Bold)
-			{
-				style |= FontStyle.Bold;
-			}
-			if (font1.IsItalic)
-				style |= FontStyle.Italic;
-			if (font1.Underline == FontUnderlineType.Single)
-			{
-				style |= FontStyle.Underline;
-			}
-			Font font = new Font(font1.FontName, font1.FontHeightInPoints, style, GraphicsUnit.Point);
-			return font;
-			//return new System.Drawing.Font(font1.FontName, font1.FontHeightInPoints);
-		}
-		public static bool ContainsCell(CellRangeAddress cr, int rowIx, int colIx)
-		{
-			if (cr.FirstRow <= rowIx && cr.LastRow >= rowIx
-					&& cr.FirstColumn <= colIx && cr.LastColumn >= colIx)
-			{
-				return true;
-			}
-			return false;
-		}
+        /// <summary>
+        /// Convert HSSFFont to Font.
+        /// </summary>
+        /// <param name="font1">The font.</param>
+        /// <returns></returns>
+        internal static Font IFont2Font(IFont font1)
+        {
+            FontStyle style = FontStyle.Regular;
+            if (font1.IsBold)
+            {
+                style |= FontStyle.Bold;
+            }
+            if (font1.IsItalic)
+                style |= FontStyle.Italic;
+            if (font1.Underline == FontUnderlineType.Single)
+            {
+                style |= FontStyle.Underline;
+            }
+            Font font = new Font(font1.FontName, (float)font1.FontHeightInPoints, style, GraphicsUnit.Point);
+            return font;
+        }
+        /// <summary>
+        /// Check if the cell is in the specified cell range
+        /// </summary>
+        /// <param name="cr">the cell range to check in</param>
+        /// <param name="rowIx">the row to check</param>
+        /// <param name="colIx">the column to check</param>
+        /// <returns>return true if the range contains the cell [rowIx, colIx]</returns>
+        [Obsolete("deprecated 3.15 beta 2. Use {@link CellRangeAddressBase#isInRange(int, int)}.")]
+        public static bool ContainsCell(CellRangeAddress cr, int rowIx, int colIx)
+        {
+            return cr.IsInRange(rowIx, colIx);
+        }
 
 		/**
 		 * Generate a valid sheet name based on the existing one. Used when cloning sheets.
@@ -662,18 +657,5 @@ namespace NPOI.SS.Util
 			return null;
 		}
 
-		public static int getDefaultCharWidth(IWorkbook wb)
-		{
-			//TODO: Implement!
-			return 1;
-			//throw new NotImplementedException();
-			//IFont defaultFont = wb.GetFontAt(0);
-
-			//IAttributedString str = new AttributedString(defaultChar.ToString());
-			//copyAttributes(defaultFont, str, 0, 1);
-			//ITextLayout layout = new TextLayout(str.getIterator(), fontRenderContext);
-			//return (int)layout.getAdvance();
-		}
-
-	}
+    }
 }

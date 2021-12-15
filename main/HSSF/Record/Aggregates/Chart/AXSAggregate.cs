@@ -29,8 +29,8 @@ namespace NPOI.HSSF.Record.Aggregates.Chart
     {
         private IFmtRecordRecord ifmt = null;
         private TickRecord tick = null;
-        private FontXRecord fontx = null;
-        private List<AxisLineRecord> axisLines = new List<AxisLineRecord>();
+        private FontIndexRecord fontx = null;
+        private List<AxisLineFormatRecord> axisLines = new List<AxisLineFormatRecord>();
         private List<LineFormatRecord> lineFormats = new List<LineFormatRecord>();
         private AreaFormatRecord areaFormat = null;
         private GelFrameAggregate gelFrame = null;
@@ -45,13 +45,13 @@ namespace NPOI.HSSF.Record.Aggregates.Chart
                 ifmt = (IFmtRecordRecord)rs.GetNext();
             if (rs.PeekNextChartSid() == TickRecord.sid)
                 tick = (TickRecord)rs.GetNext();
-            if (rs.PeekNextChartSid() == FontXRecord.sid)
-                fontx = (FontXRecord)rs.GetNext();
-            if (rs.PeekNextChartSid() == AxisLineRecord.sid)
+            if (rs.PeekNextChartSid() == FontIndexRecord.sid)
+                fontx = (FontIndexRecord)rs.GetNext();
+            if (rs.PeekNextChartSid() == AxisLineFormatRecord.sid)
             {
-                while (rs.PeekNextChartSid() == AxisLineRecord.sid)
+                while (rs.PeekNextChartSid() == AxisLineFormatRecord.sid)
                 {
-                    axisLines.Add((AxisLineRecord)rs.GetNext());
+                    axisLines.Add((AxisLineFormatRecord)rs.GetNext());
                     lineFormats.Add((LineFormatRecord)rs.GetNext());
                 }
             }

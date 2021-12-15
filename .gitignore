@@ -5,9 +5,10 @@
 *.suo
 *.user
 *.sln.docstates
+*.snk
 
 # Build results
-
+.idea/
 [Dd]ebug/
 [Rr]elease/
 x64/
@@ -46,6 +47,7 @@ packages/
 *.pidb
 *.log
 *.scc
+*.nupkg
 
 # Visual C++ cache files
 ipch/
@@ -155,3 +157,4 @@ $RECYCLE.BIN/
 
 # Examples packages folder
 examples/packages
+examples/.vs/

@@ -29,6 +29,13 @@ namespace NPOI.Util
      */
     public class CodePageUtil
     {
+        static CodePageUtil() 
+        {
+            #if NETSTANDARD2_1 || NETSTANDARD2_0
+                Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+            #endif
+        }
+
         /** <p>Codepage 037, a special case</p> */
         public const int CP_037 = 37;
 
@@ -206,8 +213,17 @@ namespace NPOI.Util
          */
         public static byte[] GetBytesInCodePage(String string1, int codepage)
         {
-            String encoding = CodepageToEncoding(codepage);
-            return Encoding.GetEncoding(encoding).GetBytes(string1);
+            String cp = CodepageToEncoding(codepage);
+            Encoding encoding;
+            try
+            {
+                encoding = Encoding.GetEncoding(cp);
+            }
+            catch (Exception)
+            {
+                encoding = Encoding.ASCII;
+            }
+            return encoding.GetBytes(string1);
             //return string1.GetBytes(encoding);
         }
 

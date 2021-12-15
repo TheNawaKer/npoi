@@ -16,6 +16,7 @@
 ==================================================================== */
 using System;
 using NPOI.SS;
+using NPOI.SS.Formula.Eval;
 using NPOI.SS.UserModel;
 using NPOI.SS.Util;
 using NPOI.Util;
@@ -49,37 +50,37 @@ namespace NPOI.XSSF.Streaming
 			}
 		}
 
-		public bool BooleanCellValue
-		{
-			get
-			{
-				CellType cellType = _value.GetType();
-				switch (cellType)
-				{
-					case CellType.Blank:
-						return false;
-					case CellType.Formula:
-						{
-							FormulaValue fv = (FormulaValue)_value;
-							if (fv.GetFormulaType() != CellType.Boolean)
-								throw new InvalidOperationException(BuildTypeMismatchMessage(CellType.Boolean, CellType.Formula, false));
-							return ((BooleanFormulaValue)_value).PreEvaluatedValue;
-						}
-					case CellType.Boolean:
-						{
-							return ((BooleanValue)_value).Value;
-						}
-					default:
-						throw new InvalidOperationException(BuildTypeMismatchMessage(CellType.Boolean, cellType, false));
-				}
-			}
-		}
+        public bool BooleanCellValue
+        {
+            get
+            {
+                CellType cellType = _value.GetType();
+                switch (cellType)
+                {
+                    case CellType.Blank:
+                        return false;
+                    case CellType.Formula:
+                        {
+                            FormulaValue fv = (FormulaValue)_value;
+                            if (fv.GetFormulaType() != CellType.Boolean)
+                                throw typeMismatch(CellType.Boolean, CellType.Formula, false);
+                            return ((BooleanFormulaValue)_value).PreEvaluatedValue;
+                        }
+                    case CellType.Boolean:
+                        {
+                            return ((BooleanValue)_value).Value;
+                        }
+                    default:
+                        throw typeMismatch(CellType.Boolean, cellType, false);
+                }
+            }
+        }
 
-		private string BuildTypeMismatchMessage(CellType expectedTypeCode, CellType actualTypeCode,
-			bool isFormulaCell)
-		{
-			return string.Format("Cannot get a {0} value from a {1} {2} cell", expectedTypeCode, actualTypeCode, (isFormulaCell ? "formula " : ""));
-		}
+        //private string BuildTypeMismatchMessage(CellType expectedTypeCode, CellType actualTypeCode,
+        //    bool isFormulaCell)
+        //{
+        //    return string.Format("Cannot get a {0} value from a {1} {2} cell", expectedTypeCode, actualTypeCode,(isFormulaCell ? "formula " : ""));
+        //}
 
 		public CellType CachedFormulaResultType
 		{
@@ -109,14 +110,14 @@ namespace NPOI.XSSF.Streaming
 			}
 		}
 
-		public string CellFormula
-		{
-			get
-			{
-				if (_value.GetType() != CellType.Formula)
-					throw new InvalidOperationException(BuildTypeMismatchMessage(CellType.Formula, _value.GetType(), false));
-				return ((FormulaValue)_value).Value;
-			}
+        public string CellFormula
+        {
+            get
+            {
+                if (_value.GetType() != CellType.Formula)
+                    throw typeMismatch(CellType.Formula, _value.GetType(), false);
+                return ((FormulaValue) _value).Value;
+            }
 
 			set
 			{
@@ -157,13 +158,13 @@ namespace NPOI.XSSF.Streaming
 			get { return _value.GetType(); }
 		}
 
-		public int ColumnIndex
-		{
-			get
-			{
-				return _row.getCellIndex(this);
-			}
-		}
+        public int ColumnIndex
+        {
+            get
+            {
+                return _row.GetCellIndex(this);
+            }
+        }
 
 		public DateTime DateCellValue
 		{
@@ -175,37 +176,37 @@ namespace NPOI.XSSF.Streaming
 					return new DateTime();
 				}
 
-				double value = NumericCellValue;
-				bool date1904 = ((XSSFWorkbook)Sheet.Workbook).IsDate1904();
-				return DateUtil.GetJavaDate(value, date1904);
-			}
-		}
+                double value = NumericCellValue;
+                bool date1904 = Sheet.Workbook.IsDate1904();
+                return DateUtil.GetJavaDate(value, date1904);
+            }
+        }
 
-		public byte ErrorCellValue
-		{
-			get
-			{
-				CellType cellType = _value.GetType();
-				switch (cellType)
-				{
-					case CellType.Blank:
-						return 0;
-					case CellType.Formula:
-						{
-							FormulaValue fv = (FormulaValue)_value;
-							if (fv.GetFormulaType() != CellType.Error)
-								new InvalidOperationException(BuildTypeMismatchMessage(CellType.Error, CellType.Formula, false));
-							return ((ErrorFormulaValue)_value).PreEvaluatedValue;
-						}
-					case CellType.Error:
-						{
-							return ((ErrorValue)_value).Value;
-						}
-					default:
-						throw new InvalidOperationException(BuildTypeMismatchMessage(CellType.Error, cellType, false));
-				}
-			}
-		}
+        public byte ErrorCellValue
+        {
+            get
+            {
+                CellType cellType = _value.GetType();
+                switch (cellType)
+                {
+                    case CellType.Blank:
+                        return 0;
+                    case CellType.Formula:
+                        {
+                            FormulaValue fv = (FormulaValue)_value;
+                            if (fv.GetFormulaType() != CellType.Error)
+                                throw typeMismatch(CellType.Error, CellType.Formula, false);
+                            return ((ErrorFormulaValue)_value).PreEvaluatedValue;
+                        }
+                    case CellType.Error:
+                        {
+                            return ((ErrorValue)_value).Value;
+                        }
+                    default:
+                        throw typeMismatch(CellType.Error, cellType, false);
+                }
+            }
+        }
 
 		public IHyperlink Hyperlink
 		{
@@ -214,26 +215,24 @@ namespace NPOI.XSSF.Streaming
 				return (IHyperlink)GetPropertyValue(Property.HYPERLINK);
 			}
 
-			set
-			{
-				throw new NotImplementedException();
-				//if (Hyperlink == null)
-				//{
-				//    RemoveHyperlink();
-				//    return;
-				//}
+            set
+            {
+                if (value == null)
+                {
+                    RemoveHyperlink();
+                    return;
+                }
+                SetProperty(Property.HYPERLINK, value);
 
-				//SetProperty(Property.HYPERLINK, Hyperlink);
+                XSSFHyperlink xssfobj = (XSSFHyperlink)value;
+                // Assign to us
+                CellReference reference = new CellReference(RowIndex, ColumnIndex);
+                xssfobj.GetCTHyperlink().@ref = reference.FormatAsString();
 
-				//XSSFHyperlink xssfobj = (XSSFHyperlink)Hyperlink;
-				//// Assign to us
-				//CellReference reference = new CellReference(RowIndex, ColumnIndex);
-				//xssfobj.GetCTHyperlink().@ref = reference.FormatAsString();
-
-				//// Add to the lists
-				//Sheet._sh.addHyperlink(xssfobj);
-			}
-		}
+                // Add to the lists
+                ((SXSSFSheet)Sheet)._sh.AddHyperlink(xssfobj);
+            }
+        }
 
 		public bool IsMergedCell
 		{
@@ -252,37 +251,37 @@ namespace NPOI.XSSF.Streaming
 			}
 		}
 
-		public double NumericCellValue
-		{
-			get
-			{
-				CellType cellType = _value.GetType();
-				switch (cellType)
-				{
-					case CellType.Blank:
-						return 0.0;
-					case CellType.Formula:
-						{
-							FormulaValue fv = (FormulaValue)_value;
-							if (fv.GetFormulaType() != CellType.Numeric)
-								throw new InvalidOperationException(BuildTypeMismatchMessage(CellType.Numeric, CellType.Formula, false));
-							return ((NumericFormulaValue)_value).PreEvaluatedValue;
-						}
-					case CellType.Numeric:
-						return ((NumericValue)_value).Value;
-					default:
-						throw new InvalidOperationException(BuildTypeMismatchMessage(CellType.Numeric, cellType, false));
-				}
-			}
-		}
+        public double NumericCellValue
+        {
+            get
+            {
+                CellType cellType = _value.GetType();
+                switch (cellType)
+                {
+                    case CellType.Blank:
+                        return 0.0;
+                    case CellType.Formula:
+                        {
+                            FormulaValue fv = (FormulaValue)_value;
+                            if (fv.GetFormulaType() != CellType.Numeric)
+                                throw typeMismatch(CellType.Numeric, CellType.Formula, false);
+                            return ((NumericFormulaValue)_value).PreEvaluatedValue;
+                        }
+                    case CellType.Numeric:
+                        return ((NumericValue) _value).Value;
+                    default:
+                        throw typeMismatch(CellType.Numeric, cellType, false);
+                }
+            }
+        }
 
-		public IRichTextString RichStringCellValue
-		{
-			get
-			{
-				CellType cellType = _value.GetType();
-				if (cellType != CellType.String)
-					throw new InvalidOperationException(BuildTypeMismatchMessage(CellType.String, cellType, false));
+        public IRichTextString RichStringCellValue
+        {
+            get
+            {
+                CellType cellType = _value.GetType();
+                if (cellType != CellType.String)
+                    throw typeMismatch(CellType.String, cellType, false);
 
 				StringValue sval = (StringValue)_value;
 				if (sval.IsRichText())
@@ -300,48 +299,54 @@ namespace NPOI.XSSF.Streaming
 			get { return _row; }
 		}
 
-		public int RowIndex
-		{
-			get
-			{
-				return _row.RowNum;
-			}
-		}
+        public int RowIndex
+        {
+            get
+            {
+                return _row.RowNum;
+            }
+        }
+        public CellAddress Address
+        {
+            get
+            {
+                return new CellAddress(this);
+            }
+        }
+        public ISheet Sheet
+        {
+            get
+            {
+                return _row.Sheet;
+            }
+        }
 
-		public ISheet Sheet
-		{
-			get
-			{
-				return _row.Sheet;
-			}
-		}
-
-		public string StringCellValue
-		{
-			get
-			{
-				CellType cellType = _value.GetType();
-				switch (cellType)
-				{
-					case CellType.Blank:
-						return "";
-					case CellType.Formula:
-						{
-							FormulaValue fv = (FormulaValue)_value;
-							if (fv.GetFormulaType() != CellType.String)
-								throw new InvalidOperationException(BuildTypeMismatchMessage(CellType.String, CellType.Formula, false));
-							return ((StringFormulaValue)_value).PreEvaluatedValue;
-						}
-					case CellType.String:
-						{
-							if (((StringValue)_value).IsRichText())
-								return ((RichTextValue)_value).Value.String;
-							else
-								return ((PlainStringValue)_value).Value;
-						}
-					default:
-						throw new InvalidOperationException(BuildTypeMismatchMessage(CellType.String, cellType, false));
-				}
+        public string StringCellValue
+        {
+            get
+            {
+                CellType cellType = _value.GetType();
+                switch (cellType)
+                {
+                    case CellType.Blank:
+                        return "";
+                    case CellType.Formula:
+                        {
+                            FormulaValue fv = (FormulaValue)_value;
+                            if (fv.GetFormulaType() != CellType.String)
+                                throw typeMismatch(CellType.String, CellType.Formula, false);
+                            return ((StringFormulaValue)_value).PreEvaluatedValue;
+                        }
+                    case CellType.String:
+                    {
+                        if (((StringValue) _value).IsRichText())
+                            return ((RichTextValue) _value).Value.String;
+                        else
+                            return ((PlainStringValue) _value).Value;
+                    }
+                    default:
+                        throw typeMismatch(CellType.String, cellType, false);
+                }
 
 			}
 		}
@@ -356,21 +361,17 @@ namespace NPOI.XSSF.Streaming
 			RemoveProperty(Property.COMMENT);
 		}
 
-		//TODO: implement correctly
-		public void RemoveHyperlink()
-		{
-			throw new NotImplementedException();
-			//RemoveProperty(Property.HYPERLINK);
+        //TODO: implement correctly
+        public void RemoveHyperlink()
+        {
+            RemoveProperty(Property.HYPERLINK);
+            ((SXSSFSheet)Sheet)._sh.RemoveHyperlink(RowIndex, ColumnIndex);
+        }
 
-			//Sheet.RemoveHyperlink(getRowIndex(), getColumnIndex());
-		}
-
-		public void SetAsActiveCell()
-		{
-			//TODO: 
-			throw new NotImplementedException();
-			// Sheet.SetActiveCell(CellAddress);
-		}
+        public void SetAsActiveCell()
+        {
+            Sheet.ActiveCell = Address;
+        }
 
 		public void SetCellErrorValue(byte value)
 		{
@@ -390,20 +391,14 @@ namespace NPOI.XSSF.Streaming
 				return;
 			}
 
-			EnsureFormulaType(ComputeTypeFromFormula(formula));
-			((FormulaValue)_value).Value = formula;
-		}
+            EnsureFormulaType(ComputeTypeFromFormula(formula));
+            ((FormulaValue)_value).Value = formula;
+        }
 
-		//TODO: not implemented correctly in poi 3.16 beta
-		private CellType ComputeTypeFromFormula(String formula)
-		{
-			return CellType.Numeric;
-		}
-
-		public void SetCellType(CellType cellType)
-		{
-			EnsureType(cellType);
-		}
+        public void SetCellType(CellType cellType)
+        {
+            EnsureType(cellType);
+        }
 
 		public void SetCellValue(string value)
 		{
@@ -411,28 +406,28 @@ namespace NPOI.XSSF.Streaming
 			{
 				EnsureTypeOrFormulaType(CellType.String);
 
-				if (value.Length > SpreadsheetVersion.EXCEL2007.MaxTextLength)
-				{
-					throw new InvalidOperationException("The maximum length of cell contents (text) is 32,767 characters");
-				}
+                if (value.Length > SpreadsheetVersion.EXCEL2007.MaxTextLength)
+                {
+                    throw new ArgumentException("The maximum length of cell contents (text) is 32,767 characters");
+                }
 
-				if (_value.GetType() == CellType.Formula)
-					if (_value is NumericFormulaValue)
-					{
-						((NumericFormulaValue)_value).PreEvaluatedValue = Double.Parse(value);
-					}
-					else
-					{
-						((StringFormulaValue)_value).Value = value;
-					}
-				else
-					((PlainStringValue)_value).Value = value;
-			}
-			else
-			{
-				SetCellType(CellType.Blank);
-			}
-		}
+                if (_value.GetType() == CellType.Formula)
+                    if (_value is NumericFormulaValue)
+                    {
+                        ((NumericFormulaValue)_value).PreEvaluatedValue = Double.Parse(value);
+                    }
+                    else
+                    {
+                        ((StringFormulaValue)_value).PreEvaluatedValue = value;
+                    }
+                else
+                    ((PlainStringValue)_value).Value = value;
+            }
+            else
+            {
+                SetCellType(CellType.Blank);
+            }
+        }
 
 		public void SetCellValue(bool value)
 		{
@@ -467,18 +462,17 @@ namespace NPOI.XSSF.Streaming
 			}
 		}
 
-		public void SetCellValue(DateTime? value)
-		{
-			if (value == null)
-			{
-				SetCellType(CellType.Blank);
-				return;
-			}
-			else
-			{
-				SetCellValue(value.Value);
-			}
-		}
+        public void SetCellValue(DateTime? value)
+        {
+            if (value == null)
+            {
+                SetCellType(CellType.Blank);
+                return;
+            }
+
+            bool date1904 = ((SXSSFWorkbook)Sheet.Workbook).XssfWorkbook.IsDate1904();
+            SetCellValue(DateUtil.GetExcelDate(value.Value, date1904));
+        }
 
 		public void SetCellValue(double value)
 		{
@@ -502,82 +496,109 @@ namespace NPOI.XSSF.Streaming
 			}
 		}
 
-		private void RemoveProperty(int type)
-		{
-			Property current = _firstProperty;
-			Property previous = null;
-			while (current != null && current.GetType() != type)
-			{
-				previous = current;
-				current = current._next;
-			}
-			if (current != null)
-			{
-				if (previous != null)
-				{
-					previous._next = current._next;
-				}
-				else
-				{
-					_firstProperty = current._next;
-				}
-			}
-		}
+        public override string ToString()
+        {
+            switch (CellType)
+            {
+                case CellType.Blank:
+                    return "";
+                case CellType.Boolean:
+                    return BooleanCellValue ? "TRUE" : "FALSE";
+                case CellType.Error:
+                    return ErrorEval.GetText(ErrorCellValue);
+                case CellType.Formula:
+                    return CellFormula;
+                case CellType.Numeric:
+                    if (DateUtil.IsCellDateFormatted(this))
+                    {
+                        FormatBase sdf = new SimpleDateFormat("dd-MMM-yyyy");
+                        //sdf.setTimeZone(LocaleUtil.getUserTimeZone());
+                        return sdf.Format(DateCellValue);
+                    }
+                    return NumericCellValue + "";
+                case CellType.String:
+                    return RichStringCellValue.ToString();
+                default:
+                    return "Unknown Cell Type: " + CellType;
+            }
+        }
 
-		private void SetProperty(int type, object value)
-		{
-			Property current = _firstProperty;
-			Property previous = null;
-			while (current != null && current.GetType() != type)
-			{
-				previous = current;
-				current = current._next;
-			}
-			if (current != null)
-			{
-				current._value = value;
-			}
-			else
-			{
-				switch (type)
-				{
-					case Property.COMMENT:
-						{
-							current = new CommentProperty(value);
-							break;
-						}
-					case Property.HYPERLINK:
-						{
-							current = new HyperlinkProperty(value);
-							break;
-						}
-					default:
-						{
-							throw new InvalidOperationException("Invalid type: " + type);
-						}
-				}
-				if (previous != null)
-				{
-					previous._next = current;
-				}
-				else
-				{
-					_firstProperty = current;
-				}
-			}
-		}
+        private void RemoveProperty(int type)
+        {
+            Property current = _firstProperty;
+            Property previous = null;
+            while (current != null && current.GetType() != type)
+            {
+                previous = current;
+                current = current._next;
+            }
+            if (current != null)
+            {
+                if (previous != null)
+                {
+                    previous._next = current._next;
+                }
+                else
+                {
+                    _firstProperty = current._next;
+                }
+            }
+        }
 
-		private object GetPropertyValue(int type)
-		{
-			return getPropertyValue(type, null);
-		}
+        private void SetProperty(int type, object value)
+        {
+            Property current = _firstProperty;
+            Property previous = null;
+            while (current != null && current.GetType() != type)
+            {
+                previous = current;
+                current = current._next;
+            }
+            if (current != null)
+            {
+                current._value = value;
+            }
+            else
+            {
+                switch (type)
+                {
+                    case Property.COMMENT:
+                        {
+                            current = new CommentProperty(value);
+                            break;
+                        }
+                    case Property.HYPERLINK:
+                        {
+                            current = new HyperlinkProperty(value);
+                            break;
+                        }
+                    default:
+                        {
+                            throw new ArgumentException("Invalid type: " + type);
+                        }
+                }
+                if (previous != null)
+                {
+                    previous._next = current;
+                }
+                else
+                {
+                    _firstProperty = current;
+                }
+            }
+        }
 
-		private object getPropertyValue(int type, string defaultValue)
-		{
-			Property current = _firstProperty;
-			while (current != null && current.GetType() != type) current = current._next;
-			return current == null ? defaultValue : current._value;
-		}
+        private object GetPropertyValue(int type)
+        {
+            return GetPropertyValue(type, null);
+        }
+
+        private object GetPropertyValue(int type, string defaultValue)
+        {
+            Property current = _firstProperty;
+            while (current != null && current.GetType() != type) current = current._next;
+            return current == null ? defaultValue : current._value;
+        }
 
 		private void EnsurePlainStringType()
 		{
@@ -627,104 +648,116 @@ namespace NPOI.XSSF.Streaming
 			SetType(type);
 		}
 
-		/*package*/
-		private void SetType(CellType type)
-		{
-			switch (type)
-			{
-				case CellType.Numeric:
-					{
-						_value = new NumericValue();
-						break;
-					}
-				case CellType.String:
-					{
-						PlainStringValue sval = new PlainStringValue();
-						if (_value != null)
-						{
-							// if a cell is not blank then convert the old value to string
-							String str = convertCellValueToString();
-							sval.Value = str;
-						}
-						_value = sval;
-						break;
-					}
-				case CellType.Formula:
-					{
-						_value = new NumericFormulaValue();
-						break;
-					}
-				case CellType.Blank:
-					{
-						_value = new BlankValue();
-						break;
-					}
-				case CellType.Boolean:
-					{
-						BooleanValue bval = new BooleanValue();
-						if (_value != null)
-						{
-							// if a cell is not blank then convert the old value to string
-							bool val = convertCellValueToBoolean();
-							bval.Value = val;
-						}
-						_value = bval;
-						break;
-					}
-				case CellType.Error:
-					{
-						_value = new ErrorValue();
-						break;
-					}
-				default:
-					{
-						throw new InvalidOperationException("Illegal type " + type);
-					}
-			}
-		}
+        /*package*/
+        private void SetType(CellType type)
+        {
+            switch (type)
+            {
+                case CellType.Numeric:
+                    {
+                        _value = new NumericValue();
+                        break;
+                    }
+                case CellType.String:
+                    {
+                        PlainStringValue sval = new PlainStringValue();
+                        if (_value != null)
+                        {
+                            // if a cell is not blank then convert the old value to string
+                            String str = ConvertCellValueToString();
+                            sval.Value = str;
+                        }
+                        _value = sval;
+                        break;
+                    }
+                case CellType.Formula:
+                    {
+                        _value = new NumericFormulaValue();
+                        break;
+                    }
+                case CellType.Blank:
+                    {
+                        _value = new BlankValue();
+                        break;
+                    }
+                case CellType.Boolean:
+                    {
+                        BooleanValue bval = new BooleanValue();
+                        if (_value != null)
+                        {
+                            // if a cell is not blank then convert the old value to string
+                            bool val = convertCellValueToBoolean();
+                            bval.Value = val;
+                        }
+                        _value = bval;
+                        break;
+                    }
+                case CellType.Error:
+                    {
+                        _value = new ErrorValue();
+                        break;
+                    }
+                default:
+                    {
+                        throw new ArgumentException("Illegal type " + type);
+                    }
+            }
+        }
 
-		private void setFormulaType(CellType type)
-		{
-			Value prevValue = _value;
-			switch (type)
-			{
-				case CellType.Numeric:
-					{
-						_value = new NumericFormulaValue();
-						break;
-					}
-				case CellType.String:
-					{
-						_value = new StringFormulaValue();
-						break;
-					}
-				case CellType.Boolean:
-					{
-						_value = new BooleanFormulaValue();
-						break;
-					}
-				case CellType.Error:
-					{
-						_value = new ErrorFormulaValue();
-						break;
-					}
-				default:
-					{
-						throw new InvalidOperationException("Illegal type " + type);
-					}
-			}
+        private void setFormulaType(CellType type)
+        {
+            Value prevValue = _value;
+            switch (type)
+            {
+                case CellType.Numeric:
+                    {
+                        _value = new NumericFormulaValue();
+                        break;
+                    }
+                case CellType.String:
+                    {
+                        _value = new StringFormulaValue();
+                        break;
+                    }
+                case CellType.Boolean:
+                    {
+                        _value = new BooleanFormulaValue();
+                        break;
+                    }
+                case CellType.Error:
+                    {
+                        _value = new ErrorFormulaValue();
+                        break;
+                    }
+                default:
+                    {
+                        throw new ArgumentException("Illegal type " + type);
+                    }
+            }
 
-			// if we had a Formula before, we should copy over the _value of the formula
-			if (prevValue is FormulaValue)
-			{
-				((FormulaValue)_value).Value = ((FormulaValue)prevValue).Value;
-			}
-		}
-
-		//COPIED FROM https://svn.apache.org/repos/asf/poi/trunk/src/ooxml/java/org/apache/poi/xssf/usermodel/XSSFCell.java since the functions are declared private there
-		private bool convertCellValueToBoolean()
-		{
-			CellType cellType = _value.GetType();
+            // if we had a Formula before, we should copy over the _value of the formula
+            if (prevValue is FormulaValue)
+            {
+                ((FormulaValue)_value).Value = ((FormulaValue)prevValue).Value;
+            }
+        }
+        private CellType ComputeTypeFromFormula(String formula)
+        {
+            return CellType.Numeric;
+        }
+        //COPIED FROM https://svn.apache.org/repos/asf/poi/trunk/src/ooxml/java/org/apache/poi/xssf/usermodel/XSSFCell.java since the functions are declared private there
+        /**
+         * Used to help format error messages
+         */
+        private static InvalidOperationException typeMismatch(CellType expectedTypeCode, CellType actualTypeCode, bool isFormulaCell)
+        {
+            String msg = "Cannot get a " + expectedTypeCode + " value from a " + actualTypeCode
+                    + " " + (isFormulaCell ? "formula " : "") + "cell";
+            return new InvalidOperationException(msg);
+        }
+        private bool convertCellValueToBoolean()
+        {
+            CellType cellType = _value.GetType();
 
 			if (cellType == CellType.Formula)
 			{
@@ -747,50 +780,54 @@ namespace NPOI.XSSF.Streaming
 				default: throw new RuntimeException("Unexpected cell type (" + cellType + ")");
 			}
 
-		}
-		private String convertCellValueToString()
-		{
-			CellType cellType = _value.GetType();
-			return convertCellValueToString(cellType);
-		}
-		private String convertCellValueToString(CellType cellType)
-		{
-			switch (cellType)
-			{
-				case CellType.Blank:
-					return "";
-				case CellType.Boolean:
-					return BooleanCellValue ? "TRUE" : "FALSE";
-				case CellType.String:
-					return StringCellValue;
-				case CellType.Numeric:
-					return NumericCellValue.ToString();
-				case CellType.Error:
-					byte errVal = ErrorCellValue;
-					return FormulaError.ForInt(errVal).ToString();
+        }
+        private String ConvertCellValueToString()
+        {
+            CellType cellType = _value.GetType();
+            return ConvertCellValueToString(cellType);
+        }
+        private String ConvertCellValueToString(CellType cellType)
+        {
+            switch (cellType)
+            {
+                case CellType.Blank:
+                    return "";
+                case CellType.Boolean:
+                    return BooleanCellValue ? "TRUE" : "FALSE";
+                case CellType.String:
+                    return StringCellValue;
+                case CellType.Numeric:
+                    return NumericCellValue.ToString();
+                case CellType.Error:
+                    byte errVal = ErrorCellValue;
+                    return FormulaError.ForInt(errVal).String;
 
-				case CellType.Formula:
-					if (_value != null)
-					{
-						FormulaValue fv = (FormulaValue)_value;
-						if (fv.GetFormulaType() != CellType.Formula)
-						{
-							return convertCellValueToString(fv.GetFormulaType());
-						}
-					}
-					return "";
-				default:
-					throw new InvalidOperationException("Unexpected cell type (" + cellType + ")");
-			}
-		}
+                case CellType.Formula:
+                    if (_value != null)
+                    {
+                        FormulaValue fv = (FormulaValue)_value;
+                        if (fv.GetFormulaType() != CellType.Formula)
+                        {
+                            return ConvertCellValueToString(fv.GetFormulaType());
+                        }
+                    }
+                    return "";
+                default:
+                    throw new InvalidOperationException("Unexpected cell type (" + cellType + ")");
+            }
+        }
 
 		//END OF COPIED CODE
 
 
-		public void SetCellValue(DateTime value)
-		{
-			bool date1904 = ((SXSSFSheet)Sheet)._workbook.XssfWorkbook.IsDate1904();
-			SetCellValue(DateUtil.GetExcelDate(value, date1904));
-		}
-	}
+        public void SetCellValue(DateTime value)
+        {
+            SetCellValue((DateTime?)value);
+        }
+
+        public void SetBlank()
+        {
+            SetCellType(CellType.Blank);
+        }
+    }
 }

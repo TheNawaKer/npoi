@@ -22,6 +22,8 @@ using NPOI.OpenXmlFormats.Spreadsheet;
 using NPOI.OpenXmlFormats.Dml;
 using Dml = NPOI.OpenXmlFormats.Dml;
 using NPOI.XSSF.Model;
+using NPOI.Util;
+
 namespace NPOI.XSSF.UserModel
 {
 
@@ -75,7 +77,7 @@ namespace NPOI.XSSF.UserModel
         {
             this._ctFont = new CT_Font();
             FontName = DEFAULT_FONT_NAME;
-            FontHeight =DEFAULT_FONT_SIZE;
+            FontHeightInPoints =DEFAULT_FONT_SIZE;
         }
 
         /**
@@ -148,7 +150,7 @@ namespace NPOI.XSSF.UserModel
                 Spreadsheet.CT_Color color = _ctFont.sizeOfColorArray() == 0 ? null : _ctFont.GetColorArray(0);
                 if (color == null) return IndexedColors.Black.Index;
 
-                if (!color.indexedSpecified) return IndexedColors.Black.Index;
+                //if (!color.indexedSpecified) return IndexedColors.Black.Index;
                 long index = color.indexed;
                 if (index == XSSFFont.DEFAULT_FONT_COLOR)
                 {
@@ -226,13 +228,35 @@ namespace NPOI.XSSF.UserModel
             long index = ((color == null) || !color.themeSpecified) ? 0 : color.theme;
             return (short)index;
         }
-
-        /**
-         * get the font height in point.
-         *
-         * @return short - height in point
-         */
+        /// <summary>
+        ///  Get the font height in unit's of 1/20th of a point.
+        /// </summary>
         public double FontHeight
+        {
+            get
+            {
+                return FontHeightRaw * 20.0;
+            }
+            set 
+            {
+                FontHeightRaw = value / 20.0;
+            }
+        }
+        /// <summary>
+        ///  Get the font height in points.
+        /// </summary>
+        public double FontHeightInPoints
+        {
+            get
+            {
+                return FontHeightRaw;
+            }
+            set 
+            {
+                FontHeightRaw = value;
+            }
+        }
+        private double FontHeightRaw
         {
             get
             {
@@ -240,34 +264,15 @@ namespace NPOI.XSSF.UserModel
                 if (size != null)
                 {
                     double fontHeight = size.val;
-                    return (short)(fontHeight * 20);
+                    return fontHeight;
                 }
-                return (short)(DEFAULT_FONT_SIZE * 20);
+                return DEFAULT_FONT_SIZE;
             }
-            set 
-            {
+            set {
                 CT_FontSize fontSize = _ctFont.sizeOfSzArray() == 0 ? _ctFont.AddNewSz() : _ctFont.GetSzArray(0);
                 fontSize.val = value;
             }
         }
-
-
-        /**
-         * @see #GetFontHeight()
-         */
-        public short FontHeightInPoints
-        {
-            get
-            {
-                return (short)(FontHeight / 20);
-            }
-            set 
-            {
-                CT_FontSize fontSize = _ctFont.sizeOfSzArray() == 0 ? _ctFont.AddNewSz() : _ctFont.GetSzArray(0);
-                fontSize.val = value;
-            }
-        }
-
         /**
          * get the name of the font (i.e. Arial)
          *
@@ -386,6 +391,8 @@ namespace NPOI.XSSF.UserModel
                         case FontSuperScript.Super:
                             offSetProperty.val = ST_VerticalAlignRun.superscript;
                             break;
+                        default:
+                            throw new InvalidOperationException("Invalid type offset: " + value);
                     }
                 }
             }
@@ -421,7 +428,7 @@ namespace NPOI.XSSF.UserModel
          * @see #BOLDWEIGHT_NORMAL
          * @see #BOLDWEIGHT_BOLD
          */
-
+        [Obsolete("deprecated POI 3.15 beta 2. Use IsBold instead.")]
         public short Boldweight
         {
             get
@@ -440,13 +447,9 @@ namespace NPOI.XSSF.UserModel
          * @param charset - charset
          * @see FontCharset
          */
-        public void SetCharSet(byte charSet)
+        public void SetCharSet(byte charset)
         {
-            int cs = (int)charSet;
-            if (cs < 0)
-            {
-                cs += 256;
-            }
+            int cs = charset & 0xff;
             SetCharSet(cs);
         }
         /**
@@ -464,7 +467,7 @@ namespace NPOI.XSSF.UserModel
             }
             else
             {
-                throw new POIXMLException("Attention: an attempt to set a type of unknow charset and charSet");
+                throw new POIXMLException("Attention: An attempt was made to set an unknown character set");
             }
         }
 
@@ -500,6 +503,10 @@ namespace NPOI.XSSF.UserModel
             else
             {
                 Spreadsheet.CT_Color ctColor = _ctFont.sizeOfColorArray() == 0 ? _ctFont.AddNewColor() : _ctFont.GetColorArray(0);
+                if (ctColor.IsSetIndexed())
+                {
+                    ctColor.UnsetIndexed();
+                }
                 ctColor.SetRgb(color.RGB);
             }
         }
@@ -653,5 +660,21 @@ namespace NPOI.XSSF.UserModel
             return _ctFont.ToString().Equals(cf.GetCTFont().ToString());
         }
 
+        public void CloneStyleFrom(IFont src)
+        {
+            if (src == null)
+                return;
+
+            FontName = src.FontName;
+            FontHeight = src.FontHeight;
+            IsBold = src.IsBold;
+            Boldweight = src.Boldweight;
+            IsItalic = src.IsItalic;
+            IsStrikeout = src.IsStrikeout;
+            Color = src.Color;
+            Underline = src.Underline;
+            Charset = src.Charset;
+            TypeOffset = src.TypeOffset;
+        }
     }
 }

@@ -24,6 +24,7 @@ namespace NPOI.SS.Formula.PTG
     using System.Collections;
 
     using NPOI.Util;
+    using System.Collections.Generic;
 
 
     /**
@@ -209,41 +210,32 @@ namespace NPOI.SS.Formula.PTG
         //}
         public virtual object Clone()
         {
-            using (MemoryStream stream = new MemoryStream())
-            {
-
-                BinaryFormatter formatter = new BinaryFormatter();
-                formatter.Serialize(stream, this);
-                stream.Position = 0;
-                return formatter.Deserialize(stream);
-            }
-
+            return this.Copy();
         }
 
         /**
-	 * This method will return the same result as {@link #getEncodedSizeWithoutArrayData(Ptg[])}
-	 * if there are no array tokens present.
-	 * @return the full size taken to encode the specified <c>Ptg</c>s
-	 */
+	     * This method will return the same result as {@link #getEncodedSizeWithoutArrayData(Ptg[])}
+	     * if there are no array tokens present.
+	     * @return the full size taken to encode the specified <c>Ptg</c>s
+	     */
         public static int GetEncodedSize(Ptg[] ptgs)
         {
             int result = 0;
-            for (int i = 0; i < ptgs.Length; i++)
+            foreach (Ptg ptg in ptgs)
             {
-                result += ptgs[i].Size;
+                result += ptg.Size;
             }
             return result;
         }
         /**
- * Used to calculate value that should be encoded at the start of the encoded Ptg token array;
- * @return the size of the encoded Ptg tokens not including any trailing array data.
- */
+         * Used to calculate value that should be encoded at the start of the encoded Ptg token array;
+         * @return the size of the encoded Ptg tokens not including any trailing array data.
+         */
         public static int GetEncodedSizeWithoutArrayData(Ptg[] ptgs)
         {
             int result = 0;
-            for (int i = 0; i < ptgs.Length; i++)
+            foreach (Ptg ptg in ptgs)
             {
-                Ptg ptg = ptgs[i];
                 if (ptg is ArrayPtg)
                 {
                     result += ArrayPtg.PLAIN_TOKEN_SIZE;
@@ -265,22 +257,18 @@ namespace NPOI.SS.Formula.PTG
          */
         public static int SerializePtgs(Ptg[] ptgs, byte[] array, int offset)
         {
-            int size = ptgs.Length;
-
             LittleEndianByteArrayOutputStream out1 = new LittleEndianByteArrayOutputStream(array, offset);
 
-            ArrayList arrayPtgs = null;
+            List<Ptg> arrayPtgs = null;
 
-            for (int k = 0; k < size; k++)
+            foreach (Ptg ptg in ptgs)
             {
-                Ptg ptg = ptgs[k];
-
                 ptg.Write(out1);
                 if (ptg is ArrayPtg)
                 {
                     if (arrayPtgs == null)
                     {
-                        arrayPtgs = new ArrayList(5);
+                        arrayPtgs = new List<Ptg>(5);
                     }
                     arrayPtgs.Add(ptg);
 
@@ -288,9 +276,9 @@ namespace NPOI.SS.Formula.PTG
             }
             if (arrayPtgs != null)
             {
-                for (int i = 0; i < arrayPtgs.Count; i++)
+                foreach (Ptg arrayPtg in arrayPtgs)
                 {
-                    ArrayPtg p = (ArrayPtg)arrayPtgs[i];
+                    ArrayPtg p = (ArrayPtg)arrayPtg;
                     p.WriteTokenValueBytes(out1);
                 }
             }
@@ -381,9 +369,9 @@ namespace NPOI.SS.Formula.PTG
 
         public static bool DoesFormulaReferToDeletedCell(Ptg[] ptgs)
         {
-            for (int i = 0; i < ptgs.Length; i++)
+            foreach (Ptg ptg in ptgs)
             {
-                if (IsDeletedCellRef(ptgs[i]))
+                if (IsDeletedCellRef(ptg))
                 {
                     return true;
                 }

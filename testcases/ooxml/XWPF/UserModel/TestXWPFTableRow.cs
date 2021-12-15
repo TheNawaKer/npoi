@@ -15,12 +15,12 @@
    limitations under the License.
 ==================================================================== */
 
-namespace NPOI.XWPF.UserModel
+namespace TestCases.XWPF.UserModel
 {
-    using System;
 
-    using NUnit.Framework;
     using NPOI.OpenXmlFormats.Wordprocessing;
+    using NPOI.XWPF.UserModel;
+    using NUnit.Framework;
 
     [TestFixture]
     public class TestXWPFTableRow
@@ -32,7 +32,7 @@ namespace NPOI.XWPF.UserModel
             Assert.IsNotNull(ctRow);
         }
 
-         [Ignore]
+         [Test]
         public void TestSetGetCantSplitRow()
         {
             // create a table
@@ -45,10 +45,10 @@ namespace NPOI.XWPF.UserModel
 
             tr.IsCantSplitRow = true;
             bool isCant = tr.IsCantSplitRow;
-            //assert(isCant);
+
             Assert.IsTrue(isCant);
         }
-         [Ignore]
+         [Test]
         public void TestSetGetRepeatHeader()
         {
             // create a table
@@ -61,7 +61,7 @@ namespace NPOI.XWPF.UserModel
 
             tr.IsRepeatHeader =true;
             bool isRpt = tr.IsRepeatHeader;
-            //assert(isRpt);
+            
             Assert.IsTrue(isRpt);
         }
     }

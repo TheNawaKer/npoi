@@ -118,7 +118,7 @@ namespace NPOI.SS.Formula.Functions
                 if (p != 0)
                 {
                     double temp = Math.Pow(10, p);
-                    double nat = Math.Abs(n * temp);
+                    double nat = (double)((decimal)Math.Abs(n * temp));
 
                     retval = Sign(n) *
                         ((nat == (long)nat)
@@ -345,7 +345,7 @@ namespace NPOI.SS.Formula.Functions
         {
             double c;
 
-            if ((n < 0 && s > 0) || (n > 0 && s < 0))
+            if (n > 0 && s < 0)
             {
                 c = double.NaN;
             }

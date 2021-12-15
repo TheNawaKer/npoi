@@ -26,6 +26,7 @@ namespace NPOI.XWPF.UserModel
     using NPOI.XWPF.Model;
     using System.Xml.Serialization;
     using System.Diagnostics;
+    using NPOI.OOXML.XWPF.Util;
 
     /**
      * <p>High(ish) level class for working with .docx files.</p>
@@ -47,7 +48,7 @@ namespace NPOI.XWPF.UserModel
         /**
          * Keeps track on all id-values used in this document and included parts, like headers, footers, etc.
          */
-        private IdentifierManager drawingIdManager = new IdentifierManager(1L, 4294967295L);
+        private IdentifierManager drawingIdManager = new IdentifierManager(0L, 4294967295L);
         protected List<XWPFFooter> footers = new List<XWPFFooter>();
         protected List<XWPFHeader> headers = new List<XWPFHeader>();
         protected List<XWPFComment> comments = new List<XWPFComment>();
@@ -125,8 +126,9 @@ namespace NPOI.XWPF.UserModel
                     headerFooterPolicy = new XWPFHeaderFooterPolicy(this);
 
                 // Create for each XML-part in the Package a PartClass
-                foreach (POIXMLDocumentPart p in GetRelations()) {
-                    String relation = p.GetPackageRelationship().RelationshipType;
+                foreach (RelationPart rp in RelationParts) {
+                    POIXMLDocumentPart p = rp.DocumentPart;
+                    String relation = rp.Relationship.RelationshipType;
                     if (relation.Equals(XWPFRelation.STYLES.Relation))
                     {
                         this.styles = (XWPFStyles)p;
@@ -223,13 +225,14 @@ namespace NPOI.XWPF.UserModel
 
         private void InitFootnotes()
         {
-            foreach(POIXMLDocumentPart p in GetRelations()){
-               String relation = p.GetPackageRelationship().RelationshipType;
-               if (relation.Equals(XWPFRelation.FOOTNOTE.Relation)) {
+            foreach(RelationPart rp in RelationParts){
+                POIXMLDocumentPart p = rp.DocumentPart;
+                String relation = rp.Relationship.RelationshipType;
+                if (relation.Equals(XWPFRelation.FOOTNOTE.Relation)) {
                   this.footnotes = (XWPFFootnotes)p;
                   this.footnotes.OnDocumentRead();
                }
-               else if (relation.Equals(XWPFRelation.ENDNOTE.Relation))
+               if (relation.Equals(XWPFRelation.ENDNOTE.Relation))
                {
                    XmlDocument xmldoc = ConvertStreamToXml(p.GetPackagePart().GetInputStream());
                    EndnotesDocument endnotesDocument = EndnotesDocument.Parse(xmldoc, NamespaceManager);
@@ -291,8 +294,48 @@ namespace NPOI.XWPF.UserModel
             {
                 return ctDocument;
             }
+            set
+            {
+                ctDocument = value;
+            }
         }
+        /**
+         * Sets columns on document base object
+         */
+        public int ColumnCount
+        {
+            get
+            {
+                return int.Parse(ctDocument.body.sectPr.cols.num);
+            }
+            set
+            {
+                if (ctDocument != null)
+                {
+                    ctDocument.body.sectPr.cols.num = value.ToString();
+                }
 
+            }
+            
+        }
+        /**
+         * Sets Text Direction of Document
+         */
+         public ST_TextDirection TextDirection
+        {
+            get
+            {
+                return ctDocument.body.sectPr.textDirection.val;
+            }
+            set
+            {
+                if (ctDocument != null)
+                {
+                    ctDocument.body.sectPr.textDirection.val = value;
+                }
+            }
+            
+        }
         internal IdentifierManager DrawingIdManager
         {
             get
@@ -343,7 +386,7 @@ namespace NPOI.XWPF.UserModel
          */
         public XWPFTable GetTableArray(int pos)
         {
-            if (pos > 0 && pos < tables.Count)
+            if (pos >= 0 && pos < tables.Count)
             {
                 return tables[(pos)];
             }
@@ -364,7 +407,11 @@ namespace NPOI.XWPF.UserModel
 
         public XWPFFooter GetFooterArray(int pos)
         {
-            return footers[(pos)];
+            if (pos >= 0 && pos < footers.Count)
+            {
+                return footers[(pos)];
+            }
+            return null;
         }
 
         /**
@@ -381,7 +428,12 @@ namespace NPOI.XWPF.UserModel
 
         public XWPFHeader GetHeaderArray(int pos)
         {
-            return headers[(pos)];
+            if (pos >= 0 && pos < headers.Count)
+            {
+                return headers[(pos)];
+            }
+            return null;
+            
         }
 
         public String GetTblStyle(XWPFTable table)
@@ -478,7 +530,18 @@ namespace NPOI.XWPF.UserModel
         {
             return headerFooterPolicy;
         }
-
+        public XWPFHeaderFooterPolicy CreateHeaderFooterPolicy()
+        {
+            if (headerFooterPolicy == null)
+            {
+                if (!ctDocument.body.IsSetSectPr())
+                {
+                    ctDocument.body.AddNewSectPr();
+                }
+                headerFooterPolicy = new XWPFHeaderFooterPolicy(this);
+            }
+            return headerFooterPolicy;
+        }
         /**
          * Returns the styles object used
          */
@@ -810,12 +873,10 @@ namespace NPOI.XWPF.UserModel
          */
         private int GetRelationIndex(XWPFRelation relation)
         {
-            List<POIXMLDocumentPart> relations = GetRelations();
             int i = 1;
-            for (IEnumerator<POIXMLDocumentPart> it = relations.GetEnumerator(); it.MoveNext(); )
+            foreach (RelationPart rp in RelationParts)
             {
-                POIXMLDocumentPart item = it.Current;
-                if (item.GetPackageRelationship().RelationshipType.Equals(relation.Relation))
+                if (rp.Relationship.RelationshipType.Equals(relation.Relation))
                 {
                     i++;
                 }
@@ -987,29 +1048,22 @@ namespace NPOI.XWPF.UserModel
             return table;
         }
 
-        /**
-         * 
-         */
+        /// <summary>
+        /// Create a Table of Contents (TOC) at the end of the document.
+        /// Please set paragraphs style to "Heading{#}" and document
+        /// styles for TOC <see cref="DocumentStylesBuilder.BuildStylesForTOC"/>.
+        /// Otherwise, it renders an empty one.
+        /// </summary>
         public void CreateTOC()
         {
-            CT_SdtBlock block = this.Document.body.AddNewSdt();
-            TOC toc = new TOC(block);
-            foreach (XWPFParagraph par in paragraphs)
-            {
-                String parStyle = par.Style;
-                if (parStyle != null && parStyle.StartsWith("Heading"))
-                {
-                    try
-                    {
-                        int level = Int32.Parse(parStyle.Substring("Heading".Length));
-                        toc.AddRow(level, par.Text, 1, "112723803");
-                    }
-                    catch (FormatException e)
-                    {
-                        Debug.Write(e.StackTrace);
-                    }
-                }
-            }
+            var ctStyles = DocumentStylesBuilder.BuildStylesForTOC();
+            styles.SetStyles(ctStyles);
+
+            CT_SdtBlock tocBlock = Document.body.AddNewSdt();
+            TOC toc = new TOC(tocBlock);
+            toc.Build();
+
+            EnforceUpdateFields(); // one time pop-up to update TOC when opening document
         }
 
         /**Replace content of table in array tables at position pos with a
@@ -1020,6 +1074,23 @@ namespace NPOI.XWPF.UserModel
         {
             tables[pos] = table;
             ctDocument.body.SetTblArray(pos, table.GetCTTbl());
+        }
+
+        /**
+         * Verifies that the documentProtection tag in settings.xml file <br/>
+         * specifies that the protection is enforced (w:enforcement="1") <br/>
+         * <br/>
+         * sample snippet from settings.xml
+         * <pre>
+         *     &lt;w:settings  ... &gt;
+         *         &lt;w:documentProtection w:edit=&quot;readOnly&quot; w:enforcement=&quot;1&quot;/&gt;
+         * </pre>
+         *
+         * @return true if documentProtection is enforced with option any
+         */
+        public bool IsEnforcedProtection()
+        {
+            return Settings.IsEnforcedWith();
         }
 
         /**
@@ -1349,14 +1420,8 @@ namespace NPOI.XWPF.UserModel
                  */
                 PackagePart picDataPart = xwpfPicData.GetPackagePart();
                 // TODO add support for TargetMode.EXTERNAL relations.
-                TargetMode targetMode = TargetMode.Internal;
-                PackagePartName partName = picDataPart.PartName;
-                String relation = relDesc.Relation;
-                PackageRelationship relShip = GetPackagePart().AddRelationship(partName, targetMode, relation);
-                String id = relShip.Id;
-                AddRelation(id, xwpfPicData);
-                pictures.Add(xwpfPicData);
-                return id;
+                RelationPart rp = AddRelation(null, XWPFRelation.IMAGES, xwpfPicData);
+                return rp.Relationship.Id;
             }
             else
             {
@@ -1474,7 +1539,36 @@ namespace NPOI.XWPF.UserModel
         {
             return tables.GetEnumerator();
         }
-
+        /// <summary>
+        /// Change orientation of a Word file
+        /// </summary>
+        /// <param name="orientation"></param>
+        /// <remarks>https://stackoverflow.com/questions/26483837/landscape-and-portrait-pages-in-the-same-word-document-using-apache-poi-xwpf-in</remarks>
+        public void ChangeOrientation(ST_PageOrientation orientation)
+        {
+            var body = this.Document.body;
+            if (body.sectPr == null)
+            {
+                body.AddNewSectPr();
+            }
+            var section = body.sectPr;
+            XWPFParagraph para = this.CreateParagraph();
+            var ctp = para.GetCTP();
+            var br = ctp.AddNewPPr();
+            br.sectPr = section;
+            var pageSize = section.pgSz;
+            pageSize.orient = orientation;
+            if (orientation== ST_PageOrientation.landscape)
+            {
+                pageSize.w = 842 * 20;
+                pageSize.h = 595 * 20;
+            }
+            else
+            {
+                pageSize.h = 842 * 20;
+                pageSize.w = 595 * 20;
+            }
+        }
         public IEnumerator<XWPFParagraph> GetParagraphsEnumerator()
         {
             return paragraphs.GetEnumerator();

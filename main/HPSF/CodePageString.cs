@@ -57,6 +57,9 @@ namespace NPOI.HPSF
 
         public String GetJavaValue(int codepage)
         {
+#if NETSTANDARD2_1 || NETSTANDARD2_0
+            Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+#endif 
             String result;
             if (codepage == -1)
                 result = Encoding.UTF8.GetString(_value);
@@ -88,10 +91,12 @@ namespace NPOI.HPSF
 
         public void SetJavaValue(String aString, int codepage)
         {
+            String stringNT = aString + "\0";
             if (codepage == -1)
-                _value = Encoding.UTF8.GetBytes(aString + "\0");
+                _value = Encoding.UTF8.GetBytes(stringNT);
             else
-                _value = Encoding.GetEncoding(codepage).GetBytes(aString + "\0");
+                _value = CodePageUtil.GetBytesInCodePage(stringNT, codepage);
+                //_value = Encoding.GetEncoding(codepage).GetBytes(aString + "\0");
         }
 
         public int Write(Stream out1)

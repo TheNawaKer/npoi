@@ -41,6 +41,16 @@ namespace NPOI.POIFS.FileSystem
         /// <param name="offset"></param>
         /// <returns></returns>
         public abstract ByteBuffer GetBlockAt(int offset);
+
+
+        /// <summary>
+        /// Tries to load the block at the given offset.
+        /// </summary>
+        /// <param name="offset">An offset in the buffer, 0 or greater.</param>
+        /// <param name="byteBuffer">The resulting buffer, if possible.</param>
+        /// <returns>True if it was possible to load the block from the specified offset, false if the offset is beyond the size of the buffer.</returns>
+        public abstract bool TryGetBlockAt(int offset, out ByteBuffer byteBuffer);
+
         /// <summary>
         /// Extends the file if required to hold blocks up to
         /// the specified offset, and return the block from there.
@@ -82,45 +92,50 @@ namespace NPOI.POIFS.FileSystem
         /// <returns></returns>
         public abstract ChainLoopDetector GetChainLoopDetector();
 
-        
+
     }
-        /// <summary>
-        /// Used to detect if a chain has a loop in it, so
-        ///  we can bail out with an error rather than
-        ///  spinning away for ever... 
-        /// </summary>
+    /// <summary>
+    /// Used to detect if a chain has a loop in it, so
+    ///  we can bail out with an error rather than
+    ///  spinning away for ever... 
+    /// </summary>
     public class ChainLoopDetector
-        {
-            private bool[] used_blocks;
+    {
+        private bool[] used_blocks;
         private BlockStore blockStore;
 
         public ChainLoopDetector(long rawSize, BlockStore blockStore)
-            {
+        {
             this.blockStore = blockStore;
-            int numBlocks = (int)Math.Ceiling(1.0 * (rawSize / blockStore.GetBlockStoreBlockSize()));
-                used_blocks = new bool[numBlocks];
+            int blkSize = blockStore.GetBlockStoreBlockSize();
+            int numBlocks = (int)(rawSize / blkSize);
+            if ((rawSize % blkSize) != 0)
+            {
+                numBlocks++;
             }
+            used_blocks = new bool[numBlocks];
+        }
 
         public void Claim(int offset)
+        {
+            if (offset >= used_blocks.Length)
             {
-                if (offset >= used_blocks.Length)
-                {
-                    // They're writing, and have had new blocks requested
-                    //  for the write to proceed. That means they're into
-                    //  blocks we've allocated for them, so are safe
-                    return;
-                }
-
-                // Claiming an existing block, ensure there's no loop
-                if (used_blocks[offset])
-                {
-                    throw new InvalidOperationException(
-                          "Potential loop detected - Block " + offset +
-                          " was already claimed but was just requested again"
-                    );
-                }
-                used_blocks[offset] = true;
+                // They're writing, and have had new blocks requested
+                //  for the write to proceed. That means they're into
+                //  blocks we've allocated for them, so are safe
+                return;
             }
+
+            // Claiming an existing block, ensure there's no loop
+            if (used_blocks[offset])
+            {
+                throw new InvalidOperationException(
+                      "Potential loop detected - Block " + offset +
+                      " was already claimed but was just requested again"
+                );
+            }
+            used_blocks[offset] = true;
         }
+    }
 
 }

@@ -104,7 +104,7 @@ namespace NPOI.XSSF.UserModel
         {
             if (this._stylesSource != src)
             {
-                throw new ArgumentException("This Style does not belong to the supplied Workbook Stlyes Source. Are you trying to assign a style from one workbook to the cell of a differnt workbook?");
+                throw new ArgumentException("This Style does not belong to the supplied Workbook Styles Source. Are you trying to assign a style from one workbook to the cell of a different workbook?");
             }
         }
 
@@ -146,12 +146,25 @@ namespace NPOI.XSSF.UserModel
                             _cellXf.UnsetExtLst();
 
                         // Create a new Xf with the same contents
-                        _cellXf =
-                              src.GetCoreXf().Copy();
+                        _cellXf = src.GetCoreXf().Copy();
+                        if (_cellXf.applyBorder)
+                        {
+                            //CellXF is copied with existing Ids, but those are different if you're copying between two documents
+                            _cellXf.borderId = FindAddBorder(src._stylesSource.GetBorderAt((int)_cellXf.borderId).GetCTBorder());
+                        }
 
                         // bug 56295: ensure that the fills is available and set correctly
                         CT_Fill fill = CT_Fill.Parse(src.GetCTFill().ToString());
                         AddFill(fill);
+
+                        // bug 58084: set borders correctly
+                        CT_Border border = CT_Border.Parse(src.GetCTBorder().ToString());
+                        AddBorder(border);
+
+                        if (src._cellStyleXf.applyBorder)
+                        {
+                            _cellStyleXf.borderId = FindAddBorder(src.GetCTBorder());
+                        }
 
                         // Swap it over
                         _stylesSource.ReplaceCellXfAt(_cellXfId, _cellXf);
@@ -198,6 +211,31 @@ namespace NPOI.XSSF.UserModel
             _cellXf.fillId = (uint)(idx);
             _cellXf.applyFill = (true);
         }
+
+        private void AddBorder(CT_Border border)
+        {
+            int idx = _stylesSource.PutBorder(new XSSFCellBorder(border, _theme));
+
+            _cellXf.borderId = (uint)(idx);
+            _cellXf.applyBorder = (true);
+        }
+
+        private uint FindAddBorder(CT_Border border)
+        {
+            //Find an existing border that matches this one, if not add a copy to the current source and update the reference.
+            int findThis = border.ToString().GetHashCode();
+            uint index = 0;
+            foreach (XSSFCellBorder existing in _stylesSource.GetBorders())
+            {
+                if (findThis == existing.GetCTBorder().ToString().GetHashCode())
+                {
+                    return index;
+                }
+                index++;
+            }
+            //404 border not found. Add it
+            return (uint)_stylesSource.PutBorder(new XSSFCellBorder(border.Copy()));
+        }
         public HorizontalAlignment Alignment
         {
             get
@@ -224,6 +262,9 @@ namespace NPOI.XSSF.UserModel
             return HorizontalAlignment.General;
         }
 
+        /// <summary>
+        /// Get or set the type of border to use for the bottom border of the cell
+        /// </summary>
         public BorderStyle BorderBottom
         {
             get
@@ -243,7 +284,7 @@ namespace NPOI.XSSF.UserModel
             }
             set
             {
-                CT_Border ct = GetCTBorder();
+                CT_Border ct = GetCTBorder(copy: true);
                 CT_BorderPr pr = ct.IsSetBottom() ? ct.bottom : ct.AddNewBottom();
                 if (value == BorderStyle.None) 
                     ct.UnsetBottom();
@@ -257,7 +298,9 @@ namespace NPOI.XSSF.UserModel
             }
         }
 
-
+        /// <summary>
+        /// Get or set the type of border to use for the left border of the cell
+        /// </summary>
         public BorderStyle BorderLeft
         {
             get
@@ -277,7 +320,7 @@ namespace NPOI.XSSF.UserModel
             }
             set
             {
-                CT_Border ct = GetCTBorder();
+                CT_Border ct = GetCTBorder(copy: true);
                 CT_BorderPr pr = ct.IsSetLeft() ? ct.left : ct.AddNewLeft();
                 if (value == BorderStyle.None) ct.unsetLeft();
                 else pr.style = (ST_BorderStyle)value;
@@ -291,7 +334,7 @@ namespace NPOI.XSSF.UserModel
         }
 
         /// <summary>
-        /// Get the type of border to use for the right border of the cell
+        /// Get or set the type of border to use for the right border of the cell
         /// </summary>
         public BorderStyle BorderRight
         {
@@ -312,7 +355,7 @@ namespace NPOI.XSSF.UserModel
             }
             set
             {
-                CT_Border ct = GetCTBorder();
+                CT_Border ct = GetCTBorder(copy: true);
                 CT_BorderPr pr = ct.IsSetRight() ? ct.right : ct.AddNewRight();
                 if (value == BorderStyle.None) ct.unsetRight();
                 else pr.style = (ST_BorderStyle)value;
@@ -324,6 +367,9 @@ namespace NPOI.XSSF.UserModel
             }
         }
 
+        /// <summary>
+        /// Get or set the type of border to use for the top border of the cell
+        /// </summary>
         public BorderStyle BorderTop
         {
             get
@@ -343,7 +389,7 @@ namespace NPOI.XSSF.UserModel
             }
             set
             {
-                CT_Border ct = GetCTBorder();
+                CT_Border ct = GetCTBorder(copy: true);
                 CT_BorderPr pr = ct.IsSetTop() ? ct.top : ct.AddNewTop();
                 if (value == BorderStyle.None) ct.unsetTop();
                 else pr.style = (ST_BorderStyle)value;
@@ -495,7 +541,7 @@ namespace NPOI.XSSF.UserModel
                 CT_PatternFill ptrn = ct.patternFill;
                 if (value == null)
                 {
-                    if (ptrn != null) ptrn.UnsetBgColor();
+                    if (ptrn != null && ptrn.IsSetBgColor()) ptrn.UnsetBgColor();
                 }
                 else
                 {
@@ -572,7 +618,7 @@ namespace NPOI.XSSF.UserModel
                 CT_PatternFill ptrn = ct.patternFill;
                 if (value == null)
                 {
-                    if (ptrn != null) ptrn.UnsetFgColor();
+                    if (ptrn != null && ptrn.IsSetFgColor()) ptrn.UnsetFgColor();
                 }
                 else
                 {
@@ -588,7 +634,7 @@ namespace NPOI.XSSF.UserModel
             get
             {
                 // bug 56295: handle missing applyFill attribute as "true" because Excel does as well
-                if (_cellXf.IsSetApplyFill() && !_cellXf.applyFill) return 0;
+                if (_cellXf.IsSetApplyFill() && !_cellXf.applyFill) return FillPattern.NoFill;
 
                 int FillIndex = (int)_cellXf.fillId;
                 XSSFCellFill fill = _stylesSource.GetFillAt(FillIndex);
@@ -597,6 +643,7 @@ namespace NPOI.XSSF.UserModel
                 if(ptrn == ST_PatternType.none) return FillPattern.NoFill;
 
                 return (FillPattern)((int)ptrn);
+                //return FillPattern.forInt(ptrn.intValue() - 1);  minus one in poi, why???
             }
             set
             {
@@ -604,7 +651,9 @@ namespace NPOI.XSSF.UserModel
                 CT_PatternFill ptrn = ct.IsSetPatternFill() ? ct.GetPatternFill() : ct.AddNewPatternFill();
                 if (value == FillPattern.NoFill && ptrn.IsSetPatternType())
                     ptrn.UnsetPatternType();
-                else ptrn.patternType = (ST_PatternType)(value);
+                else
+                    ptrn.patternType = (ST_PatternType)(value);
+                // ctptrn.setPatternType(STPatternType.Enum.forInt(pattern.getCode() + 1));  plus one in poi, why???
 
                 AddFill(ct);
             }
@@ -810,6 +859,11 @@ namespace NPOI.XSSF.UserModel
         }
         /// <summary>
         /// Get the degree of rotation (between 0 and 180 degrees) for the text in the cell
+        /// 
+        /// Note: HSSF uses values from -90 to 90 degrees, whereas XSSF 
+        /// uses values from 0 to 180 degrees.The implementations of this method will map between these two value-ranges
+        /// accordingly, however the corresponding getter is returning values in the range mandated by the current type
+        /// of Excel file-format that this CellStyle is applied to.
         /// </summary>
         /// <example>
         /// Expressed in degrees. Values range from 0 to 180. The first letter of
@@ -918,7 +972,7 @@ namespace NPOI.XSSF.UserModel
          */
         public void SetBottomBorderColor(XSSFColor color)
         {
-            CT_Border ct = GetCTBorder();
+            CT_Border ct = GetCTBorder(copy: true);
             if (color == null && !ct.IsSetBottom()) return;
 
             CT_BorderPr pr = ct.IsSetBottom() ? ct.bottom : ct.AddNewBottom();
@@ -1028,7 +1082,7 @@ namespace NPOI.XSSF.UserModel
         /**
          * Get a <b>copy</b> of the currently used CT_Border, if none is used, return a new instance.
          */
-        public CT_Border GetCTBorder()
+        public CT_Border GetCTBorder(bool copy = false)
         {
             CT_Border ctBorder;
             if (_cellXf.applyBorder)
@@ -1037,6 +1091,11 @@ namespace NPOI.XSSF.UserModel
                 XSSFCellBorder cf = _stylesSource.GetBorderAt(idx);
 
                 ctBorder = (CT_Border)cf.GetCTBorder();
+
+                if (copy)
+                {
+                    ctBorder = ctBorder.Copy();
+                }
             }
             else
             {
@@ -1054,7 +1113,7 @@ namespace NPOI.XSSF.UserModel
         /**
          * Set the font for this style
          *
-         * @param font  a font object Created or retreived from the XSSFWorkbook object
+         * @param font  a font object Created or retrieved from the XSSFWorkbook object
          * @see NPOI.xssf.usermodel.XSSFWorkbook#CreateFont()
          * @see NPOI.xssf.usermodel.XSSFWorkbook#getFontAt(short)
          */
@@ -1074,7 +1133,7 @@ namespace NPOI.XSSF.UserModel
         }
         public void SetDiagonalBorderColor(XSSFColor color)
         {
-            CT_Border ct = GetCTBorder();
+            CT_Border ct = GetCTBorder(copy: true);
             if (color == null && !ct.IsSetDiagonal()) return;
 
             CT_BorderPr pr = ct.IsSetDiagonal() ? ct.diagonal : ct.AddNewDiagonal();
@@ -1093,7 +1152,7 @@ namespace NPOI.XSSF.UserModel
          */
         public void SetLeftBorderColor(XSSFColor color)
         {
-            CT_Border ct = GetCTBorder();
+            CT_Border ct = GetCTBorder(copy: true);
             if (color == null && !ct.IsSetLeft()) return;
 
             CT_BorderPr pr = ct.IsSetLeft() ? ct.left : ct.AddNewLeft();
@@ -1113,7 +1172,7 @@ namespace NPOI.XSSF.UserModel
          */
         public void SetRightBorderColor(XSSFColor color)
         {
-            CT_Border ct = GetCTBorder();
+            CT_Border ct = GetCTBorder(copy: true);
             if (color == null && !ct.IsSetRight()) return;
 
             CT_BorderPr pr = ct.IsSetRight() ? ct.right : ct.AddNewRight();
@@ -1136,7 +1195,7 @@ namespace NPOI.XSSF.UserModel
          */
         public void SetTopBorderColor(XSSFColor color)
         {
-            CT_Border ct = GetCTBorder();
+            CT_Border ct = GetCTBorder(copy: true);
             if (color == null && !ct.IsSetTop()) return;
 
             CT_BorderPr pr = ct.IsSetTop() ? ct.top : ct.AddNewTop();
@@ -1345,7 +1404,7 @@ namespace NPOI.XSSF.UserModel
             }
             set
             {
-                CT_Border ct = GetCTBorder();
+                CT_Border ct = GetCTBorder(copy: true);
                 CT_BorderPr pr = ct.IsSetDiagonal() ? ct.diagonal : ct.AddNewDiagonal();
                 if (value == BorderStyle.None)
                     ct.unsetDiagonal();
@@ -1375,7 +1434,7 @@ namespace NPOI.XSSF.UserModel
             }
             set
             {
-                CT_Border ct = GetCTBorder();
+                CT_Border ct = GetCTBorder(copy: true);
                 if (value == BorderDiagonal.Both)
                 {
                     ct.diagonalDown = true;

@@ -21,6 +21,7 @@ namespace NPOI.SS.UserModel
     using System;
     using System.Text.RegularExpressions;
     using System.Text;
+    using NPOI.Util;
 
     /// <summary>
     /// Contains methods for dealing with Excel dates.
@@ -46,13 +47,13 @@ namespace NPOI.SS.UserModel
         /**
          * The following patterns are used in {@link #isADateFormat(int, String)}
          */
-        private static Regex date_ptrn1 = new Regex("^\\[\\$\\-.*?\\]");
-        private static Regex date_ptrn2 = new Regex("^\\[[a-zA-Z]+\\]");
-        private static Regex date_ptrn3a = new Regex("[yYmMdDhHsS]");
-        private static Regex date_ptrn3b = new Regex("^[\\[\\]yYmMdDhHsS\\-T/,. :\"\\\\]+0*[ampAMP/]*$");
+        private static Regex date_ptrn1 = new Regex("^\\[\\$\\-.*?\\]", RegexOptions.Compiled);
+        private static Regex date_ptrn2 = new Regex("^\\[[a-zA-Z]+\\]", RegexOptions.Compiled);
+        private static Regex date_ptrn3a = new Regex("[yYmMdDhHsS]", RegexOptions.Compiled);
+        private static Regex date_ptrn3b = new Regex("^[\\[\\]yYmMdDhHsS\\-T/,. :\"\\\\]+0*[ampAMP/]*$", RegexOptions.Compiled);
         //  elapsed time patterns: [h],[m] and [s]
-        //private static Regex date_ptrn4 = new Regex("^\\[([hH]+|[mM]+|[sS]+)\\]");
-        private static Regex date_ptrn4 = new Regex("^\\[([hH]+|[mM]+|[sS]+)\\]$");
+        //private static Regex date_ptrn4 = new Regex("^\\[([hH]+|[mM]+|[sS]+)\\]", RegexOptions.Compiled);
+        private static Regex date_ptrn4 = new Regex("^\\[([hH]+|[mM]+|[sS]+)\\]$", RegexOptions.Compiled);
 
 
         /// <summary>
@@ -61,7 +62,7 @@ namespace NPOI.SS.UserModel
         /// <param name="cal">the date</param>
         /// <param name="use1904windowing">if set to <c>true</c> [use1904windowing].</param>
         /// <returns>number of days since 1899/12/31</returns>
-        public static int AbsoluteDay(DateTime cal, bool use1904windowing)
+        public static int absoluteDay(DateTime cal, bool use1904windowing)
         {
             int daynum = (cal - new DateTime(1899, 12, 31)).Days;
             if (cal > new DateTime(1900, 3, 1) && use1904windowing)
@@ -69,6 +70,32 @@ namespace NPOI.SS.UserModel
                 daynum++;
             }
             return daynum;
+        }
+        public static int AbsoluteDay(DateTime cal, bool use1904windowing)
+        {
+            return cal.DayOfYear
+                   + DaysInPriorYears(cal.Year, use1904windowing);
+        }
+        /// <summary>
+        /// Return the number of days in prior years since 1900
+        /// </summary>
+        /// <param name="yr">a year (1900 &lt; yr &gt; 4000).</param>
+        /// <param name="use1904windowing"></param>
+        /// <returns>number of days in years prior to yr</returns>
+        private static int DaysInPriorYears(int yr, bool use1904windowing)
+        {
+            if ((!use1904windowing && yr < 1900) || (use1904windowing && yr < 1904))
+            {
+                throw new ArgumentException("'year' must be 1900 or greater");
+            }
+
+            int yr1 = yr - 1;
+            int leapDays = yr1 / 4   // plus julian leap days in prior years
+                           - yr1 / 100 // minus prior century years
+                           + yr1 / 400 // plus years divisible by 400
+                           - 460;      // leap days in previous 1900 years
+
+            return 365 * (yr - (use1904windowing ? 1904 : 1900)) + leapDays;
         }
         /// <summary>
         /// Given a Date, Converts it into a double representing its internal Excel representation,
@@ -225,7 +252,16 @@ namespace NPOI.SS.UserModel
         {
             return GetJavaDate(date, false);
         }
+        public static DateTime GetJavaDate(double date, TimeZoneInfo tz)
+        {
+            return GetJavaDate(date, false, tz, false);
+        }
 
+        [Obsolete("The class TimeZone was marked obsolete, Use the Overload using TimeZoneInfo instead.")]
+        public static DateTime GetJavaDate(double date, TimeZone tz)
+        {
+            return GetJavaDate(date, false, tz, false);
+        }
 
         /**
          *  Given an Excel date with either 1900 or 1904 date windowing,
@@ -248,7 +284,7 @@ namespace NPOI.SS.UserModel
          */
         public static DateTime GetJavaDate(double date, bool use1904windowing)
         {
-            return GetJavaCalendar(date, use1904windowing, false);
+            return GetJavaCalendar(date, use1904windowing, (TimeZoneInfo)null, false);
         }
         /**
          *  Given an Excel date with either 1900 or 1904 date windowing,
@@ -265,9 +301,29 @@ namespace NPOI.SS.UserModel
          *   or false if using 1900 date windowing.
          *  @return Java representation of the date, or null if date is not a valid Excel date
          */
-        public static DateTime getJavaDate(double date, bool use1904windowing, TimeZone tz)
+        public static DateTime GetJavaDate(double date, bool use1904windowing, TimeZoneInfo tz)
         {
-            return GetJavaCalendar(date, use1904windowing, false);
+            return GetJavaCalendar(date, use1904windowing, tz, false);
+        }
+        /**
+         *  Given an Excel date with either 1900 or 1904 date windowing,
+         *  converts it to a java.util.Date.
+         *  
+         *  Excel Dates and Times are stored without any timezone 
+         *  information. If you know (through other means) that your file 
+         *  uses a different TimeZone to the system default, you can use
+         *  this version of the getJavaDate() method to handle it.
+         *   
+         *  @param date  The Excel date.
+         *  @param tz The TimeZone to evaluate the date in
+         *  @param use1904windowing  true if date uses 1904 windowing,
+         *   or false if using 1900 date windowing.
+         *  @return Java representation of the date, or null if date is not a valid Excel date
+         */
+        [Obsolete("The class TimeZone was marked obsolete, Use the Overload using TimeZoneInfo instead.")]
+        public static DateTime GetJavaDate(double date, bool use1904windowing, TimeZone tz)
+        {
+            return GetJavaCalendar(date, use1904windowing, tz, false);
         }
         /**
          *  Given an Excel date with either 1900 or 1904 date windowing,
@@ -285,12 +341,34 @@ namespace NPOI.SS.UserModel
          *  @param roundSeconds round to closest second
          *  @return Java representation of the date, or null if date is not a valid Excel date
          */
-        public static DateTime GetJavaDate(double date, bool use1904windowing, TimeZone tz, bool roundSeconds)
+        public static DateTime GetJavaDate(double date, bool use1904windowing, TimeZoneInfo tz, bool roundSeconds)
         {
-            return GetJavaCalendar(date, use1904windowing, roundSeconds);
+            return GetJavaCalendar(date, use1904windowing, tz, roundSeconds);
         }
 
-        public static void SetCalendar(ref DateTime calendar, int wholeDays,
+        /**
+         *  Given an Excel date with either 1900 or 1904 date windowing,
+         *  converts it to a java.util.Date.
+         *  
+         *  Excel Dates and Times are stored without any timezone 
+         *  information. If you know (through other means) that your file 
+         *  uses a different TimeZone to the system default, you can use
+         *  this version of the getJavaDate() method to handle it.
+         *   
+         *  @param date  The Excel date.
+         *  @param tz The TimeZone to evaluate the date in
+         *  @param use1904windowing  true if date uses 1904 windowing,
+         *   or false if using 1900 date windowing.
+         *  @param roundSeconds round to closest second
+         *  @return Java representation of the date, or null if date is not a valid Excel date
+         */
+        [Obsolete("The class TimeZone was marked obsolete, Use the Overload using TimeZoneInfo instead.")]
+        public static DateTime GetJavaDate(double date, bool use1904windowing, TimeZone tz, bool roundSeconds)
+        {
+            return GetJavaCalendar(date, use1904windowing, tz, roundSeconds);
+        }
+
+        public static DateTime SetCalendar(int wholeDays,
             int millisecondsInDay, bool use1904windowing, bool roundSeconds)
         {
             int startYear = 1900;
@@ -312,9 +390,14 @@ namespace NPOI.SS.UserModel
                 dt = dt.AddMilliseconds(500);
                 dt = dt.AddMilliseconds(-dt.Millisecond);
             }
-            calendar = dt;
-
+            return dt;
         }
+
+        public static DateTime GetJavaCalendar(double date)
+        {
+            return GetJavaCalendar(date, false, (TimeZoneInfo)null, false);
+        }
+
         /**
          * Get EXCEL date as Java Calendar with given time zone.
          * @param date  The Excel date.
@@ -325,16 +408,28 @@ namespace NPOI.SS.UserModel
          */
         public static DateTime GetJavaCalendar(double date, bool use1904windowing)
         {
-            return GetJavaCalendar(date, use1904windowing, false);
+            return GetJavaCalendar(date, use1904windowing, (TimeZoneInfo)null, false);
+        }
+
+        public static DateTime GetJavaCalendarUTC(double date, bool use1904windowing)
+        {
+            DateTime dt = GetJavaCalendar(date, use1904windowing, (TimeZoneInfo)null, false);
+            return TimeZoneInfo.ConvertTimeToUtc(dt);
+        }
+
+        public static DateTime GetJavaCalendar(double date, bool use1904windowing, TimeZoneInfo timeZone)
+        {
+            return GetJavaCalendar(date, use1904windowing, timeZone, false);
         }
         /// <summary>
         /// Get EXCEL date as Java Calendar (with default time zone). This is like GetJavaDate(double, boolean) but returns a Calendar object.
         /// </summary>
         /// <param name="date">The Excel date.</param>
         /// <param name="use1904windowing">true if date uses 1904 windowing, or false if using 1900 date windowing.</param>
+        /// <param name="timeZone"></param>
         /// <param name="roundSeconds"></param>
         /// <returns>null if date is not a valid Excel date</returns>
-        public static DateTime GetJavaCalendar(double date, bool use1904windowing, bool roundSeconds)
+        public static DateTime GetJavaCalendar(double date, bool use1904windowing, TimeZoneInfo timeZone, bool roundSeconds)
         {
             if (!IsValidExcelDate(date))
             {
@@ -342,10 +437,52 @@ namespace NPOI.SS.UserModel
             }
             int wholeDays = (int)Math.Floor(date);
             int millisecondsInDay = (int)((date - wholeDays) * DAY_MILLISECONDS + 0.5);
-            DateTime calendar;
+            DateTime calendar= DateTime.Now;
 
-            calendar = DateTime.Now;     // using default time-zone
-            SetCalendar(ref calendar, wholeDays, millisecondsInDay, use1904windowing, roundSeconds);
+            //if (timeZone != null)
+            //{
+            //    calendar = LocaleUtil.GetLocaleCalendar(timeZone);
+            //}
+            //else
+            //{
+            //    calendar = LocaleUtil.GetLocaleCalendar(); // using default time-zone
+            //}
+            calendar = SetCalendar(wholeDays, millisecondsInDay, use1904windowing, roundSeconds);
+            return calendar;
+        }
+
+        [Obsolete("The class TimeZone was marked obsolete, Use the Overload using TimeZoneInfo instead.")]
+        public static DateTime GetJavaCalendar(double date, bool use1904windowing, TimeZone timeZone)
+        {
+            return GetJavaCalendar(date, use1904windowing, timeZone, false);
+        }
+        /// <summary>
+        /// Get EXCEL date as Java Calendar (with default time zone). This is like GetJavaDate(double, boolean) but returns a Calendar object.
+        /// </summary>
+        /// <param name="date">The Excel date.</param>
+        /// <param name="use1904windowing">true if date uses 1904 windowing, or false if using 1900 date windowing.</param>
+        /// <param name="timeZone"></param>
+        /// <param name="roundSeconds"></param>
+        /// <returns>null if date is not a valid Excel date</returns>
+        [Obsolete("The class TimeZone was marked obsolete, Use the Overload using TimeZoneInfo instead.")]
+        public static DateTime GetJavaCalendar(double date, bool use1904windowing, TimeZone timeZone, bool roundSeconds)
+        {
+            if (!IsValidExcelDate(date))
+            {
+                throw new ArgumentException(string.Format(CultureInfo.CurrentCulture, "Invalid Excel date double value: {0}", date));
+            }
+            int wholeDays = (int)Math.Floor(date);
+            int millisecondsInDay = (int)((date - wholeDays) * DAY_MILLISECONDS + 0.5);
+            DateTime calendar= DateTime.Now;
+            //if (timeZone != null)
+            //{
+            //    calendar = LocaleUtil.GetLocaleCalendar(timeZone);
+            //}
+            //else
+            //{
+            //    calendar = LocaleUtil.GetLocaleCalendar(); // using default time-zone
+            //}
+            calendar = SetCalendar(wholeDays, millisecondsInDay, use1904windowing, roundSeconds);
             return calendar;
         }
 
@@ -452,11 +589,12 @@ namespace NPOI.SS.UserModel
                 // If it end in ;@, that's some crazy dd/mm vs mm/dd
                 //  switching stuff, which we can ignore
                 fs = Regex.Replace(fs, ";@", "");
-                StringBuilder sb = new StringBuilder(fs.Length);
-                for (int i = 0; i < fs.Length; i++)
+                int length = fs.Length;
+                StringBuilder sb = new StringBuilder(length);
+                for (int i = 0; i < length; i++)
                 {
                     char c = fs[i];
-                    if (i < fs.Length - 1)
+                    if (i < length - 1)
                     {
                         char nc = fs[i + 1];
                         if (c == '\\')
@@ -506,9 +644,10 @@ namespace NPOI.SS.UserModel
                 // You're allowed something like dd/mm/yy;[red]dd/mm/yy
                 //  which would place dates before 1900/1904 in red
                 // For now, only consider the first one
-                if (fs.IndexOf(';') > 0 && fs.IndexOf(';') < fs.Length - 1)
+                int separatorIndex = fs.IndexOf(';');
+                if (separatorIndex > 0 && separatorIndex < fs.Length - 1)
                 {
-                    fs = fs.Substring(0, fs.IndexOf(';'));
+                    fs = fs.Substring(0, separatorIndex);
                 }
                 // Ensure it has some date letters in it
                 // (Avoids false positives on the rest of pattern 3)

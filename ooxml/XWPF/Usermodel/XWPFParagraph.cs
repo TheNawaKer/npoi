@@ -124,7 +124,7 @@ namespace NPOI.XWPF.UserModel
             {
                 if (o is CT_R)
                 {
-                    XWPFRun r = new XWPFRun((CT_R)o, this);
+                    XWPFRun r = new XWPFRun((CT_R)o, (IRunBody)this);
                     runs.Add(r);
                     iRuns.Add(r);
                 }
@@ -138,6 +138,15 @@ namespace NPOI.XWPF.UserModel
                         runs.Add(hr);
                         iRuns.Add(hr);
 
+                    }
+                }
+                if (o is CT_SimpleField) {
+                    CT_SimpleField field = (CT_SimpleField)o;
+                    foreach (CT_R r in field.GetRList())
+                    {
+                        XWPFFieldRun fr = new XWPFFieldRun(field, r, this);
+                        runs.Add(fr);
+                        iRuns.Add(fr);
                     }
                 }
                 if (o is CT_SdtBlock)
@@ -154,16 +163,7 @@ namespace NPOI.XWPF.UserModel
                 {
                     foreach (CT_R r in ((CT_RunTrackChange)o).GetRList())
                     {
-                        XWPFRun cr = new XWPFRun(r, this);
-                        runs.Add(cr);
-                        iRuns.Add(cr);
-                    }
-                }
-                if (o is CT_SimpleField)
-                {
-                    foreach (CT_R r in ((CT_SimpleField)o).GetRList())
-                    {
-                        XWPFRun cr = new XWPFRun(r, this);
+                        XWPFRun cr = new XWPFRun(r, (IRunBody)this);
                         runs.Add(cr);
                         iRuns.Add(cr);
                     }
@@ -173,6 +173,18 @@ namespace NPOI.XWPF.UserModel
                     // Smart Tags can be nested many times. 
                     // This implementation does not preserve the tagging information
                     BuildRunsInOrderFromXml((o as CT_SmartTagRun).Items);
+                }
+                if (o is CT_RunTrackChange) {
+                    // add all the insertions as text
+                    foreach (CT_RunTrackChange ins in ((CT_RunTrackChange)o).GetInsList())
+                    {
+                        foreach (CT_R r in ins.GetRList())
+                        {
+                            XWPFRun cr = new XWPFRun(r, (IRunBody)this);
+                            runs.Add(cr);
+                            iRuns.Add(cr);
+                        }
+                    }
                 }
             }
         }
@@ -189,7 +201,7 @@ namespace NPOI.XWPF.UserModel
         }
 
 
-        internal CT_P GetCTP()
+        public CT_P GetCTP()
         {
             return paragraph;
         }
@@ -229,9 +241,6 @@ namespace NPOI.XWPF.UserModel
                 //!paragraph.getDomNode().hasChildNodes();
                 //inner xml include objects holded by Items and pPr object
                 //should use children of pPr node, but we didn't keep reference to it.
-                //return paragraph.Items.Count == 0 && (paragraph.pPr == null ||
-                //    paragraph.pPr != null && paragraph.pPr.rPr == null && paragraph.pPr.sectPr == null && paragraph.pPr.pPrChange == null
-                //    );
                 return paragraph.Items.Count == 0 && (paragraph.pPr == null || paragraph.pPr.IsEmpty);
             }
         }
@@ -255,7 +264,16 @@ namespace NPOI.XWPF.UserModel
                 StringBuilder out1 = new StringBuilder();
                 foreach (IRunElement run in iRuns)
                 {
-                    if (run is XWPFSDT)
+                    if (run is XWPFRun)
+                    {
+                        XWPFRun xRun = (XWPFRun)run;
+                        // don't include the text if reviewing is enabled and this is a deleted run
+                        if (xRun.GetCTR().GetDelTextList().Count==0)
+                        {
+                            out1.Append(xRun.ToString());
+                        }
+                    }
+                    else if (run is XWPFSDT)
                     {
                         out1.Append(((XWPFSDT)run).Content.Text);
                     }
@@ -307,11 +325,30 @@ namespace NPOI.XWPF.UserModel
             }
             return null;
         }
-        /**
-         * Returns Ilvl of the numeric style for this paragraph.
-         * Returns null if this paragraph does not have numeric style.
-         * @return Ilvl as BigInteger
-         */
+        /// <summary>
+        /// setNumILvl of Paragraph
+        /// </summary>
+        /// <param name="iLvl"></param>
+        public void SetNumILvl(string iLvl)
+        {
+            if (paragraph.pPr == null)
+            {
+                paragraph.AddNewPPr();
+            }
+            if (paragraph.pPr.numPr == null)
+            {
+                paragraph.pPr.AddNewNumPr();
+            }
+            if (paragraph.pPr.numPr.ilvl == null)
+            {
+                paragraph.pPr.numPr.AddNewIlvl();
+            }
+            paragraph.pPr.numPr.ilvl.val=iLvl;
+        }
+        /// <summary>
+        /// Returns Ilvl of the numeric style for this paragraph.
+        /// </summary>
+        /// <returns></returns>
         public string GetNumIlvl()
         {
             if (paragraph.pPr != null)
@@ -324,12 +361,10 @@ namespace NPOI.XWPF.UserModel
             }
             return null;
         }
-
-        /**
-         * Returns numbering format for this paragraph, eg bullet or
-         *  lowerLetter.
-         * Returns null if this paragraph does not have numeric style.
-         */
+        /// <summary>
+        /// Returns numbering format for this paragraph, eg bullet or lowerLetter.
+        /// </summary>
+        /// <returns></returns>
         public String GetNumFmt()
         {
             string numID = GetNumID();
@@ -358,12 +393,9 @@ namespace NPOI.XWPF.UserModel
             }
             return null;
         }
-
-        /**
-     * Returns the text that should be used around the paragraph level numbers.
-     *
-     * @return a string (e.g. "%1.") or null if the value is not found.
-     */
+        /// <summary>
+        /// Returns the text that should be used around the paragraph level numbers.
+        /// </summary>
         public String NumLevelText
         {
             get
@@ -417,11 +449,10 @@ namespace NPOI.XWPF.UserModel
             }
         }
 
-
-        /**
-         * Gets the numstartOverride for the paragraph numbering for this paragraph.
-         * @return returns the overridden start number or null if there is no override for this paragraph.
-         */
+        /// <summary>
+        /// Gets the numstartOverride for the paragraph numbering for this paragraph.
+        /// </summary>
+        /// <returns></returns>
         public string GetNumStartOverride()
         {
             string numID = GetNumID();
@@ -458,11 +489,10 @@ namespace NPOI.XWPF.UserModel
             return null;
         }
 
-
-        /**
-         * SetNumID of Paragraph
-         * @param numPos
-         */
+        /// <summary>
+        /// SetNumID of Paragraph
+        /// </summary>
+        /// <param name="numId"></param>
         public void SetNumID(string numId)
         {
             if (paragraph.pPr == null)
@@ -496,10 +526,9 @@ namespace NPOI.XWPF.UserModel
             paragraph.pPr.numPr.ilvl.val = ilvl;
             paragraph.pPr.numPr.numId.val = (numId);
         }
-        /**
-         * Returns the text of the paragraph, but not of any objects in the
-         * paragraph
-         */
+        /// <summary>
+        /// Returns the text of the paragraph, but not of any objects in the paragraph
+        /// </summary>
         public String ParagraphText
         {
             get
@@ -512,10 +541,9 @@ namespace NPOI.XWPF.UserModel
                 return text.ToString();
             }
         }
-
-        /**
-         * Returns any text from any suitable pictures in the paragraph
-         */
+        /// <summary>
+        /// Returns any text from any suitable pictures in the paragraph
+        /// </summary>
         public String PictureText
         {
             get
@@ -529,11 +557,9 @@ namespace NPOI.XWPF.UserModel
             }
         }
 
-        /**
-         * Returns the footnote text of the paragraph
-         *
-         * @return  the footnote text or empty string if the paragraph does not have footnotes
-         */
+        /// <summary>
+        /// Returns the footnote text of the paragraph
+        /// </summary>
         public String FootnoteText
         {
             get
@@ -542,19 +568,9 @@ namespace NPOI.XWPF.UserModel
             }
         }
 
-        /**
-         * Returns the paragraph alignment which shall be applied to text in this
-         * paragraph.
-         * <p>
-         * If this element is not Set on a given paragraph, its value is determined
-         * by the Setting previously Set at any level of the style hierarchy (i.e.
-         * that previous Setting remains unChanged). If this Setting is never
-         * specified in the style hierarchy, then no alignment is applied to the
-         * paragraph.
-         * </p>
-         *
-         * @return the paragraph alignment of this paragraph.
-         */
+        /// <summary>
+        /// Returns the paragraph alignment which shall be applied to text in this paragraph.
+        /// </summary>
         public ParagraphAlignment Alignment
         {
             get
@@ -570,9 +586,9 @@ namespace NPOI.XWPF.UserModel
             }
         }
 
-        /**
-         * @return The raw alignment value, {@link #getAlignment()} is suggested
-         */
+        /// <summary>
+        /// The raw alignment value
+        /// </summary>
         public int FontAlignment
         {
             get
@@ -978,6 +994,36 @@ namespace NPOI.XWPF.UserModel
             }
         }
 
+        ///<summary>
+        /// Return the spacing between lines of a paragraph. The units of the return value depends on the
+        /// <see cref="LineSpacingRule"/>. If AUTO, the return value is in lines, otherwise the return
+        /// value is in points
+        /// 
+        /// <return>a double specifying points or lines.</return>
+        ///</summary>
+        public double SpacingBetween
+        {
+            set
+            {
+                setSpacingBetween(value, LineSpacingRule.AUTO);
+            }
+
+        }
+        public void setSpacingBetween(double spacing, LineSpacingRule rule)
+        {
+            CT_Spacing ctSp = GetCTSpacing(true);
+            switch(rule)
+            {
+                case LineSpacingRule.AUTO:
+                    ctSp.line = Math.Round(spacing * 240.0).ToString();
+                    break;
+                default:
+                    ctSp.line = Math.Round(spacing * 20.0).ToString();
+                    break;
+            }
+            ctSp.lineRule = EnumConverter.ValueOf<ST_LineSpacingRule, LineSpacingRule>(rule);
+
+        }
 
         /**
          * Specifies the indentation which shall be placed between the left text
@@ -1260,7 +1306,13 @@ namespace NPOI.XWPF.UserModel
         /// <param name="newText">replacement text</param>
         public void ReplaceText(string oldText, string newText)
         {
+            if (string.IsNullOrEmpty(oldText))
+            {
+                throw new ArgumentNullException("oldText should not be null");
+            }
             TextSegment ts= this.SearchText(oldText, new PositionInParagraph() { Run = 0 });
+            if (ts == null)
+                return;
             if (ts.BeginRun == ts.EndRun)
             {
                 this.runs[ts.BeginRun].ReplaceText(oldText, newText);
@@ -1288,11 +1340,11 @@ namespace NPOI.XWPF.UserModel
             int startRun = startPos.Run,
                 startText = startPos.Text,
                 startChar = startPos.Char;
-            int beginRunPos = 0, candCharPos = 0;
+            int beginRunPos = 0, beginTextPos = 0, beginCharPos = 0,candCharPos = 0;
             bool newList = false;
             for (int runPos = startRun; runPos < paragraph.GetRList().Count; runPos++)
             {
-                int beginTextPos = 0, beginCharPos = 0, textPos = 0, charPos = 0;
+                int  textPos = 0, charPos = 0;
                 CT_R ctRun = paragraph.GetRList()[runPos];
                 foreach (object o in ctRun.Items)
                 {
@@ -1360,7 +1412,7 @@ namespace NPOI.XWPF.UserModel
          */
         public XWPFRun CreateRun()
         {
-            XWPFRun xwpfRun = new XWPFRun(paragraph.AddNewR(), this);
+            XWPFRun xwpfRun = new XWPFRun(paragraph.AddNewR(), (IRunBody)this);
             runs.Add(xwpfRun);
             iRuns.Add(xwpfRun);
             return xwpfRun;
@@ -1378,21 +1430,35 @@ namespace NPOI.XWPF.UserModel
             return oMath;
         }
 
-        /**
-         * insert a new Run in RunArray
-         * @param pos
-         * @return  the inserted run
-         */
+        /// <summary>
+        /// insert a new Run in RunArray
+        /// </summary>
+        /// <param name="pos">The position at which the new run should be added.</param>
+        /// <returns>the inserted run or null if the given pos is out of bounds.</returns>
         public XWPFRun InsertNewRun(int pos)
         {
-            if (pos >= 0 && pos <= paragraph.SizeOfRArray())
+            if (pos >= 0 && pos <= runs.Count)
             {
-                CT_R ctRun = paragraph.InsertNewR(pos);
-                XWPFRun newRun = new XWPFRun(ctRun, this);
+                // calculate the correct pos as our run/irun list contains
+                // hyperlinks
+                // and fields so it is different to the paragraph R array.
+                int rPos = 0;
+                for (int i = 0; i < pos; i++)
+                {
+                    XWPFRun currRun = runs[i];
+                    if (!(currRun is XWPFHyperlinkRun
+                        || currRun is XWPFFieldRun))
+                    {
+                        rPos++;
+                    }
+                }
 
-                // To update the iRuns, find where we're going
-                // in the normal Runs, and go in there
-                int iPos = iRuns.Count;
+            CT_R ctRun = paragraph.InsertNewR(rPos);
+            XWPFRun newRun = new XWPFRun(ctRun, (IRunBody)this);
+
+            // To update the iRuns, find where we're going
+            // in the normal Runs, and go in there
+            int iPos = iRuns.Count;
                 if (pos < runs.Count)
                 {
                     XWPFRun oldAtPos = runs[(pos)];
@@ -1457,13 +1523,27 @@ namespace NPOI.XWPF.UserModel
          */
         public bool RemoveRun(int pos)
         {
-            if (pos >= 0 && pos < paragraph.SizeOfRArray())
+            if (pos >= 0 && pos < runs.Count)
             {
                 // Remove the run from our high level lists
                 XWPFRun run = runs[(pos)];
+                if (run is XWPFHyperlinkRun || run is XWPFFieldRun)
+                {
+                    // TODO Add support for removing these kinds of nested runs,
+                    //  which aren't on the CTP -> R array, but CTP -> XXX -> R array
+                    throw new ArgumentException("Removing Field or Hyperlink runs not yet supported");
+                }
                 runs.RemoveAt(pos);
                 iRuns.Remove(run);
                 // Remove the run from the low-level XML
+                //calculate the correct pos as our run/irun list contains hyperlinks and fields so is different to the paragraph R array.
+                int rPos = 0;
+                for (int i = 0; i < pos; i++)
+                {
+                    XWPFRun currRun = runs[i];
+                    if (!(currRun is XWPFHyperlinkRun || currRun is XWPFFieldRun))
+                        rPos++;
+                }
                 GetCTP().RemoveR(pos);
                 return true;
             }
@@ -1548,6 +1628,25 @@ namespace NPOI.XWPF.UserModel
             }
             return null;
         }
+        /// <summary>
+        /// Appends a new hyperlink run to this paragraph
+        /// </summary>
+        /// <param name="rId">a new hyperlink run</param>
+        /// <returns></returns>
+        public XWPFHyperlinkRun CreateHyperlinkRun(string rId)
+        {
+            CT_R r = new CT_R();
+            r.AddNewRPr().rStyle = new CT_String() { val = "Hyperlink" };
 
-    }//end class
+            CT_Hyperlink1 hl = paragraph.AddNewHyperlink();
+            hl.history = ST_OnOff.on;
+            hl.id = rId;
+            hl.Items.Add(r);
+            XWPFHyperlinkRun xwpfRun = new XWPFHyperlinkRun(hl, r, this);
+            runs.Add(xwpfRun);
+            iRuns.Add(xwpfRun);
+            return xwpfRun;
+        }
+    }
+
 }

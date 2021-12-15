@@ -32,7 +32,7 @@ namespace NPOI.XWPF.UserModel
         protected StringBuilder text = new StringBuilder();
         private CT_Tbl ctTbl;
         protected List<XWPFTableRow> tableRows;
-        protected List<String> styleIDs;
+        //protected List<String> styleIDs;
 
         // Create a map from this XWPF-level enum to the STBorder.Enum values
         public enum XWPFBorderType { NIL, NONE, SINGLE, THICK, DOUBLE, DOTTED, DASHED, DOT_DASH };
@@ -163,7 +163,7 @@ namespace NPOI.XWPF.UserModel
          * @return ctTbl object
          */
 
-        internal CT_Tbl GetCTTbl()
+        public CT_Tbl GetCTTbl()
         {
             return ctTbl;
         }
@@ -266,7 +266,7 @@ namespace NPOI.XWPF.UserModel
             }
         }
 
-        private CT_TblPr GetTrPr()
+        public CT_TblPr GetTrPr()
         {
             return (ctTbl.tblPr != null) ? ctTbl.tblPr : ctTbl
                     .AddNewTblPr();

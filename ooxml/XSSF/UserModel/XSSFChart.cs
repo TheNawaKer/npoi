@@ -73,8 +73,8 @@ namespace NPOI.XSSF.UserModel
          * @param rel  the namespace relationship holding this chart,
          * the relationship type must be http://schemas.Openxmlformats.org/officeDocument/2006/relationships/chart
          */
-        protected XSSFChart(PackagePart part, PackageRelationship rel)
-            : base(part, rel)
+        protected XSSFChart(PackagePart part)
+            : base(part)
         {
 
             XmlDocument doc = ConvertStreamToXml(part.GetInputStream());
@@ -82,6 +82,12 @@ namespace NPOI.XSSF.UserModel
             chart = chartSpaceDocument.GetChartSpace().chart;
         }
 
+        [Obsolete("deprecated in POI 3.14, scheduled for removal in POI 3.16")]
+        protected XSSFChart(PackagePart part, PackageRelationship rel)
+            : this(part)
+        {
+
+        }
         /**
          * Construct a new CTChartSpace bean.
          * By default, it's just an empty placeholder for chart objects.
@@ -108,25 +114,20 @@ namespace NPOI.XSSF.UserModel
             pageMargins.footer = 0.30;
             printSettings.AddNewPageSetup();
         }
-
-        /**
-         * Return the underlying CTChartSpace bean, the root element of the SpreadsheetML Chart part.
-         *
-         * @return the underlying CTChartSpace bean
-         */
-
-        internal CT_ChartSpace GetCTChartSpace()
+        /// <summary>
+        /// Return the underlying CTChartSpace bean, the root element of the SpreadsheetML Chart part.
+        /// </summary>
+        /// <returns></returns>
+        public CT_ChartSpace GetCTChartSpace()
         {
             return chartSpaceDocument.GetChartSpace();
         }
 
-        /**
-         * Return the underlying CTChart bean, within the Chart Space
-         *
-         * @return the underlying CTChart bean
-         */
-
-        internal CT_Chart GetCTChart()
+        /// <summary>
+        /// Return the underlying CTChart bean, within the Chart Space
+        /// </summary>
+        /// <returns></returns>
+        public CT_Chart GetCTChart()
         {
             return chart;
         }
@@ -146,11 +147,10 @@ namespace NPOI.XSSF.UserModel
             PackagePart part = GetPackagePart();            
             chartSpaceDocument.Save(part.GetOutputStream());            
         }
-
-        /**
-         * Returns the parent graphic frame.
-         * @return the graphic frame this chart belongs to
-         */
+        /// <summary>
+        /// Returns the parent graphic frame.
+        /// </summary>
+        /// <returns></returns>
         public XSSFGraphicFrame GetGraphicFrame()
         {
             return frame;
@@ -277,6 +277,74 @@ namespace NPOI.XSSF.UserModel
                 if(title.tx.rich==null)
                     return null;
                 return new XSSFRichTextString(title.tx.rich.ToString());
+            }
+        }
+
+        /**
+	     * Sets the title text.
+	     */
+        public void SetTitle(string newTitle)
+        {
+            CT_Title ctTitle;
+            if (chart.IsSetTitle())
+            {
+                ctTitle = chart.title;
+            }
+            else
+            {
+                ctTitle = chart.AddNewTitle();
+            }
+
+            CT_Tx tx;
+            if (ctTitle.IsSetTx())
+            {
+                tx = ctTitle.tx;
+            }
+            else
+            {
+                tx = ctTitle.AddNewTx();
+            }
+
+            if (tx.IsSetStrRef())
+            {
+                tx.UnsetStrRef();
+            }
+
+            OpenXmlFormats.Dml.Chart.CT_TextBody rich;
+            if (tx.IsSetRich())
+            {
+                rich = tx.rich;
+            }
+            else
+            {
+                rich = tx.AddNewRich();
+                rich.AddNewBodyPr();  // body properties must exist (but can be empty)
+            }
+
+            CT_TextParagraph para;
+            if (rich.SizeOfPArray() > 0)
+            {
+                para = rich.GetPArray(0);
+            }
+            else
+            {
+                para = rich.AddNewP();
+            }
+
+            if (para.SizeOfRArray() > 0)
+            {
+                CT_RegularTextRun run = para.GetRArray(0);
+                run.t = (newTitle);
+            }
+            else if (para.SizeOfFldArray() > 0)
+            {
+                OpenXmlFormats.Dml.CT_TextField fld = para.GetFldArray(0);
+                fld.t = (newTitle);
+            }
+            else
+            {
+                CT_RegularTextRun run = para.AddNewR();
+                run.t = (newTitle);
             }
         }
 

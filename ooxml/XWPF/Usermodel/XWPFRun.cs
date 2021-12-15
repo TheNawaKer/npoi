@@ -186,6 +186,8 @@ namespace NPOI.XWPF.UserModel
             XmlSerializer xmlse = new XmlSerializer(typeof(NPOI.OpenXmlFormats.Dml.Picture.CT_Picture));
             foreach (string el in god.Any)
             {
+                if (el.IndexOf("pic:pic") < 0)
+                    continue;
                 System.IO.StringReader stringReader = new System.IO.StringReader(el);
 
                 NPOI.OpenXmlFormats.Dml.Picture.CT_Picture pict =
@@ -252,6 +254,8 @@ namespace NPOI.XWPF.UserModel
         {
             if (!onoff.IsSetVal())
                 return true;
+            //CT_OnOff.val is a boolean field, and parse "1","-1","true","on" valus as true.
+            //see CT_OnOff.Parse(XmlNode, XmlNamespaceManager)
             return onoff.val;
         }
 
@@ -574,7 +578,7 @@ namespace NPOI.XWPF.UserModel
         /**
          * Specifies that the contents of this run.shall be displayed with a single
          * horizontal line through the center of the line.
-         * <p/>
+         * <p>
          * This formatting property is a toggle property, which specifies that its
          * behavior differs between its use within a style defInition and its use as
          * direct formatting. When used as part of a style defInition, Setting this
@@ -585,7 +589,7 @@ namespace NPOI.XWPF.UserModel
          * formatting, Setting this property to true or false shall Set the absolute
          * state of the resulting property.
          * </p>
-         * <p/>
+         * <p>
          * If this element is not present, the default value is to leave the
          * formatting applied at previous level in the style hierarchy. If this
          * element is never applied in the style hierarchy, then strikethrough shall
@@ -767,6 +771,21 @@ namespace NPOI.XWPF.UserModel
             }
 
         }
+        public bool IsHighlighted
+        {
+            get
+            {
+                CT_RPr pr = run.rPr;
+                if (pr == null || !pr.IsSetHighlight())
+                    return false;
+                if (pr.highlight.val == ST_HighlightColor.none)
+                    return false;
+                return true;
+            }
+        }
+        // TODO Provide a wrapper round STHighlightColor, then expose getter/setter
+        //  for the highlight colour. Ideally also then add to CharacterRun interface
+
 
         public int CharacterSpacing
         {
@@ -891,34 +910,19 @@ namespace NPOI.XWPF.UserModel
          *
          * @return value representing the font size
          */
-        public int FontSize
+        public double FontSize
         {
             get
             {
                 CT_RPr pr = run.rPr;
-                return (pr != null && pr.IsSetSz()) ? (int)pr.sz.val / 2 : -1;
+                return (pr != null && pr.IsSetSz()) ? pr.sz.val / 2.0 : -1;
             }
             set
             {
                 CT_RPr pr = run.IsSetRPr() ? run.rPr : run.AddNewRPr();
                 CT_HpsMeasure ctSize = pr.IsSetSz() ? pr.sz : pr.AddNewSz();
-                ctSize.val = (ulong)value * 2;
+                ctSize.val = (ulong)(value * 2);
             }
-        }
-
-        /**
-         * This element specifies the amount by which text shall be raised or
-         * lowered for this run.in relation to the default baseline of the
-         * surrounding non-positioned text. This allows the text to be repositioned
-         * without altering the font size of the contents.
-         *
-         * @return a big integer representing the amount of text shall be "moved"
-         */
-        public int GetTextPosition()
-        {
-            CT_RPr pr = run.rPr;
-            return (pr != null && pr.IsSetPosition()) ? int.Parse(pr.position.val)
-                    : -1;
         }
 
         /**
@@ -938,13 +942,25 @@ namespace NPOI.XWPF.UserModel
          * element is never applied in the style hierarchy, then the text shall not
          * be raised or lowered relative to the default baseline location for the
          * contents of this run.
+         * 
+         * @return a big integer representing the amount of text shall be "moved"
          */
-        public void SetTextPosition(int val)
+        public int TextPosition
         {
-            CT_RPr pr = run.IsSetRPr() ? run.rPr : run.AddNewRPr();
-            CT_SignedHpsMeasure position = pr.IsSetPosition() ? pr.position : pr.AddNewPosition();
-            position.val = (val.ToString());
+            get
+            {
+                CT_RPr pr = run.rPr;
+                return (pr != null && pr.IsSetPosition()) ? int.Parse(pr.position.val)
+                        : -1;
+            }
+            set
+            {
+                CT_RPr pr = run.IsSetRPr() ? run.rPr : run.AddNewRPr();
+                CT_SignedHpsMeasure position = pr.IsSetPosition() ? pr.position : pr.AddNewPosition();
+                position.val = (value.ToString());
+            }
         }
+
 
         /**
          * 
@@ -1041,6 +1057,146 @@ namespace NPOI.XWPF.UserModel
             throw new NotImplementedException();
         }
 
+        XWPFPicture AddPicture(Stream pictureData, int pictureType, String filename, int width, int height, Action<XWPFDocument, CT_Blip> extAct)
+        {
+            // Add the picture + relationship
+            String relationId;
+            XWPFPictureData picData;
+            XWPFDocument doc=null;
+
+            // Work out what to add the picture to, then add both the
+            //  picture and the relationship for it
+            // TODO Should we have an interface for this sort of thing?
+            if (parent.Part is XWPFHeaderFooter)
+            {
+                XWPFHeaderFooter headerFooter = (XWPFHeaderFooter)parent.Part;
+                relationId = headerFooter.AddPictureData(pictureData, pictureType);
+                picData = (XWPFPictureData)headerFooter.GetRelationById(relationId);
+            }
+            else
+            {
+                doc = parent.Document;
+                relationId = doc.AddPictureData(pictureData, pictureType);
+                picData = (XWPFPictureData)doc.GetRelationById(relationId);
+            }
+
+            try
+            {
+                // Create the Drawing entry for it
+                CT_Drawing Drawing = run.AddNewDrawing();
+                CT_Inline inline = Drawing.AddNewInline();
+
+                // Do the fiddly namespace bits on the inline
+                // (We need full control of what goes where and as what)
+                //CT_GraphicalObject tmp = new CT_GraphicalObject();
+                //String xml =
+                //    "<a:graphic xmlns:a=\"" + "http://schemas.openxmlformats.org/drawingml/2006/main" + "\">" +
+                //    "<a:graphicData uri=\"" + "http://schemas.openxmlformats.org/drawingml/2006/picture" + "\">" +
+                //    "<pic:pic xmlns:pic=\"" + "http://schemas.openxmlformats.org/drawingml/2006/picture" + "\" />" +
+                //    "</a:graphicData>" +
+                //    "</a:graphic>";
+                //InputSource is = new InputSource(new StringReader(xml));
+                //org.w3c.dom.Document doc = DocumentHelper.readDocument(is);
+                //inline.set(XmlToken.Factory.parse(doc.getDocumentElement(), DEFAULT_XML_OPTIONS));
+
+                inline.graphic = new CT_GraphicalObject();
+                inline.graphic.graphicData = new CT_GraphicalObjectData();
+                inline.graphic.graphicData.uri = "http://schemas.openxmlformats.org/drawingml/2006/picture";
+
+
+                // Setup the inline
+                inline.distT = (0);
+                inline.distR = (0);
+                inline.distB = (0);
+                inline.distL = (0);
+
+                NPOI.OpenXmlFormats.Dml.WordProcessing.CT_NonVisualDrawingProps docPr = inline.AddNewDocPr();
+                long id = parent.Document.DrawingIdManager.ReserveNew();
+                docPr.id = (uint)(id);
+                /* This name is not visible in Word 2010 anywhere. */
+                docPr.name = ("Drawing " + id);
+                docPr.descr = (filename);
+
+                NPOI.OpenXmlFormats.Dml.WordProcessing.CT_PositiveSize2D extent = inline.AddNewExtent();
+                extent.cx = (width);
+                extent.cy = (height);
+
+                // Grab the picture object
+                NPOI.OpenXmlFormats.Dml.Picture.CT_Picture pic = new OpenXmlFormats.Dml.Picture.CT_Picture();
+
+                // Set it up
+                NPOI.OpenXmlFormats.Dml.Picture.CT_PictureNonVisual nvPicPr = pic.AddNewNvPicPr();
+
+                NPOI.OpenXmlFormats.Dml.CT_NonVisualDrawingProps cNvPr = nvPicPr.AddNewCNvPr();
+                /* use "0" for the id. See ECM-576, 20.2.2.3 */
+                cNvPr.id = (0);
+                /* This name is not visible in Word 2010 anywhere */
+                cNvPr.name = ("Picture " + id);
+                cNvPr.descr = (filename);
+
+                CT_NonVisualPictureProperties cNvPicPr = nvPicPr.AddNewCNvPicPr();
+                cNvPicPr.AddNewPicLocks().noChangeAspect = true;
+
+                CT_BlipFillProperties blipFill = pic.AddNewBlipFill();
+                CT_Blip blip = blipFill.AddNewBlip();
+                blip.embed = (picData.GetPackageRelationship().Id);
+                if (doc != null)
+                {
+                    extAct(doc, blip);
+                }
+                blipFill.AddNewStretch().AddNewFillRect();
+
+                CT_ShapeProperties spPr = pic.AddNewSpPr();
+                CT_Transform2D xfrm = spPr.AddNewXfrm();
+
+                CT_Point2D off = xfrm.AddNewOff();
+                off.x = (0);
+                off.y = (0);
+
+                NPOI.OpenXmlFormats.Dml.CT_PositiveSize2D ext = xfrm.AddNewExt();
+                ext.cx = (width);
+                ext.cy = (height);
+
+                CT_PresetGeometry2D prstGeom = spPr.AddNewPrstGeom();
+                prstGeom.prst = (ST_ShapeType.rect);
+                prstGeom.AddNewAvLst();
+
+                using (var ms = new MemoryStream())
+                {
+                    StreamWriter sw = new StreamWriter(ms);
+                    pic.Write(sw, "pic:pic");
+                    sw.Flush();
+                    ms.Position = 0;
+                    var sr = new StreamReader(ms);
+                    var picXml = sr.ReadToEnd();
+                    inline.graphic.graphicData.AddPicElement(picXml);
+                }
+                // Finish up
+                XWPFPicture xwpfPicture = new XWPFPicture(pic, this);
+                pictures.Add(xwpfPicture);
+                return xwpfPicture;
+            }
+            catch(XmlException e)
+            {
+                throw new InvalidOperationException("XWPFRun.Addpicture error", e);
+            }
+        }
+
+        public XWPFPicture AddSvg(Stream svgData, Stream altPictureData, int altPictureType, String filename, int width, int height)
+        {
+            return AddPicture(altPictureData, altPictureType, filename, width, height, (doc, blip) =>
+            {
+                String relationId = doc.AddPictureData(svgData, (int)PictureType.SVG);
+                XWPFPictureData picData = (XWPFPictureData)doc.GetRelationById(relationId);
+                var extLst = new CT_OfficeArtExtensionList();
+                var extItem = new CT_OfficeArtExtension();
+                extItem.uri = "{96DAC541-7B7A-43D3-8B79-37D633B846F1}";
+                extItem.Any = "<asvg:svgBlip xmlns:asvg=\"http://schemas.microsoft.com/office/drawing/2016/SVG/main\" r:embed=\"" + picData.GetPackageRelationship().Id + "\"/>";
+                extLst.ext.Add(extItem);
+                blip.extLst = extLst;
+            });
+        }
+
         /**
          * Adds a picture to the run. This method handles
          *  attaching the picture data to the overall file.
@@ -1061,103 +1217,7 @@ namespace NPOI.XWPF.UserModel
          */
         public XWPFPicture AddPicture(Stream pictureData, int pictureType, String filename, int width, int height)
         {
-            XWPFDocument doc = parent.Document;
-
-            // Add the picture + relationship
-            String relationId = doc.AddPictureData(pictureData, pictureType);
-            XWPFPictureData picData = (XWPFPictureData)doc.GetRelationById(relationId);
-
-            // Create the Drawing entry for it
-            CT_Drawing Drawing = run.AddNewDrawing();
-            CT_Inline inline = Drawing.AddNewInline();
-
-            // Do the fiddly namespace bits on the inline
-            // (We need full control of what goes where and as what)
-            //CT_GraphicalObject tmp = new CT_GraphicalObject();
-            //String xml =
-            //    "<a:graphic xmlns:a=\"" + "http://schemas.openxmlformats.org/drawingml/2006/main" + "\">" +
-            //    "<a:graphicData uri=\"" + "http://schemas.openxmlformats.org/drawingml/2006/picture" + "\">" +
-            //    "<pic:pic xmlns:pic=\"" + "http://schemas.openxmlformats.org/drawingml/2006/picture" + "\" />" +
-            //    "</a:graphicData>" +
-            //    "</a:graphic>";
-            //inline.Set((xml));
-
-            XmlDocument xmlDoc = new XmlDocument();
-            //XmlElement el = xmlDoc.CreateElement("pic", "pic", "http://schemas.openxmlformats.org/drawingml/2006/picture");
-
-            inline.graphic = new CT_GraphicalObject();
-            inline.graphic.graphicData = new CT_GraphicalObjectData();
-            inline.graphic.graphicData.uri = "http://schemas.openxmlformats.org/drawingml/2006/picture";
-
-
-            // Setup the inline
-            inline.distT = (0);
-            inline.distR = (0);
-            inline.distB = (0);
-            inline.distL = (0);
-
-            NPOI.OpenXmlFormats.Dml.WordProcessing.CT_NonVisualDrawingProps docPr = inline.AddNewDocPr();
-            long id = parent.Document.DrawingIdManager.ReserveNew();
-            docPr.id = (uint)(id);
-            /* This name is not visible in Word 2010 anywhere. */
-            docPr.name = ("Drawing " + id);
-            docPr.descr = (filename);
-
-            NPOI.OpenXmlFormats.Dml.WordProcessing.CT_PositiveSize2D extent = inline.AddNewExtent();
-            extent.cx = (width);
-            extent.cy = (height);
-
-            // Grab the picture object
-            NPOI.OpenXmlFormats.Dml.Picture.CT_Picture pic = new OpenXmlFormats.Dml.Picture.CT_Picture();
-
-            // Set it up
-            NPOI.OpenXmlFormats.Dml.Picture.CT_PictureNonVisual nvPicPr = pic.AddNewNvPicPr();
-
-            NPOI.OpenXmlFormats.Dml.CT_NonVisualDrawingProps cNvPr = nvPicPr.AddNewCNvPr();
-            /* use "0" for the id. See ECM-576, 20.2.2.3 */
-            cNvPr.id = (0);
-            /* This name is not visible in Word 2010 anywhere */
-            cNvPr.name = ("Picture " + id);
-            cNvPr.descr = (filename);
-
-            CT_NonVisualPictureProperties cNvPicPr = nvPicPr.AddNewCNvPicPr();
-            cNvPicPr.AddNewPicLocks().noChangeAspect = true;
-
-            CT_BlipFillProperties blipFill = pic.AddNewBlipFill();
-            CT_Blip blip = blipFill.AddNewBlip();
-            blip.embed = (picData.GetPackageRelationship().Id);
-            blipFill.AddNewStretch().AddNewFillRect();
-
-            CT_ShapeProperties spPr = pic.AddNewSpPr();
-            CT_Transform2D xfrm = spPr.AddNewXfrm();
-
-            CT_Point2D off = xfrm.AddNewOff();
-            off.x = (0);
-            off.y = (0);
-
-            NPOI.OpenXmlFormats.Dml.CT_PositiveSize2D ext = xfrm.AddNewExt();
-            ext.cx = (width);
-            ext.cy = (height);
-
-            CT_PresetGeometry2D prstGeom = spPr.AddNewPrstGeom();
-            prstGeom.prst = (ST_ShapeType.rect);
-            prstGeom.AddNewAvLst();
-
-            using (var ms = new MemoryStream())
-            {
-                StreamWriter sw = new StreamWriter(ms);
-                pic.Write(sw, "pic:pic");
-                sw.Flush();
-                ms.Position = 0;
-                var sr = new StreamReader(ms);
-                var picXml = sr.ReadToEnd();
-                inline.graphic.graphicData.AddPicElement(picXml);
-            }
-            // Finish up
-            XWPFPicture xwpfPicture = new XWPFPicture(pic, this);
-            pictures.Add(xwpfPicture);
-            return xwpfPicture;
-
+            return AddPicture(pictureData, pictureType, filename, width, height, (doc, blip) => { });
         }
 
 		/**
@@ -1288,7 +1348,36 @@ namespace NPOI.XWPF.UserModel
         {
             return pictures;
         }
+        public void SetStyle(string styleId)
+        {
+            CT_RPr pr = GetCTR().rPr;
+            if (null == pr)
+            {
+                pr = GetCTR().AddNewRPr();
+            }
+            CT_String style = pr.rStyle != null ? pr.rStyle : pr.AddNewRStyle();
+            style.val= styleId;
+        }
+        /// <summary>
+        /// Return this run's style ID. If this run has no style (no run properties or properties without a style), an empty string is returned.
+        /// </summary>
+        /// <returns></returns>
+        public string GetStyle()
+        {
+            CT_RPr pr = GetCTR().rPr;
+            if (pr == null)
+            {
+                return "";
+            }
 
+            CT_String style = pr.rStyle;
+            if (style == null)
+            {
+                return "";
+            }
+
+            return style.val;
+        }
 
         /**
          * Add the xml:spaces="preserve" attribute if the string has leading or trailing white spaces
@@ -1298,7 +1387,7 @@ namespace NPOI.XWPF.UserModel
         static void preserveSpaces(CT_Text xs)
         {
             String text = xs.Value;
-            if (text != null && (text.StartsWith(" ") || text.EndsWith(" ")))
+            if (text != null && text.Length>=1 && (text.StartsWith(" ") || text.EndsWith(" ")))
             {
                 //    XmlCursor c = xs.NewCursor();
                 //    c.ToNextToken();
