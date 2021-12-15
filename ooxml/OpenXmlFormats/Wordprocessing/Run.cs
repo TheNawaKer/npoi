@@ -526,6 +526,12 @@ namespace NPOI.OpenXmlFormats.Wordprocessing
                     ctObj.Items.Add(new CT_Empty());
                     ctObj.ItemsElementName.Add(RunItemsChoiceType.yearShort);
                 }
+                // Custom
+                else if (childNode.LocalName == "AlternateContent")
+				{
+                    ctObj.Items.Add(CT_AlternateContent.Parse(childNode, namespaceManager));
+                    ctObj.ItemsElementName.Add(RunItemsChoiceType.alternateContent);
+				}
             }
             return ctObj;
         }
@@ -602,10 +608,12 @@ namespace NPOI.OpenXmlFormats.Wordprocessing
                     ((CT_Sym)o).Write(sw, "sym");
                 else if ((o is CT_Text) && this.ItemsElementName[i] == RunItemsChoiceType.t)
                     ((CT_Text)o).Write(sw, "t");
-                else if (o is CT_Empty&& this.ItemsElementName[i]== RunItemsChoiceType.tab)
+                else if (o is CT_Empty && this.ItemsElementName[i] == RunItemsChoiceType.tab)
                     sw.Write("<w:tab/>");
-                else if (o is CT_Empty&& this.ItemsElementName[i]== RunItemsChoiceType.yearShort)
+                else if (o is CT_Empty && this.ItemsElementName[i] == RunItemsChoiceType.yearShort)
                     sw.Write("<w:yearShort/>");
+                else if (o is CT_AlternateContent && this.ItemsElementName[i] == RunItemsChoiceType.alternateContent)
+                    ((CT_AlternateContent)o).Write(sw, "AlternateContent");
                 i++;
             }
             sw.Write(string.Format("</w:{0}>", nodeName));
@@ -628,7 +636,7 @@ namespace NPOI.OpenXmlFormats.Wordprocessing
     [XmlType(Namespace = "http://schemas.openxmlformats.org/wordprocessingml/2006/main", IncludeInSchema = false)]
     public enum RunItemsChoiceType
     {
-
+        alternateContent,
     
         annotationRef,
 
