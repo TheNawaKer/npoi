@@ -92,10 +92,12 @@ namespace NPOI.SS.UserModel
                     indexed = hashIndex[indexNum];
                 if (indexed != null)
                 {
-                    byte[] rgb = new byte[3];
-                    rgb[0] = (byte)indexed.GetTriplet()[0];
-                    rgb[1] = (byte)indexed.GetTriplet()[1];
-                    rgb[2] = (byte)indexed.GetTriplet()[2];
+                    byte[] rgb = new byte[4];
+					// Custom
+					rgb[0] = 255;
+                    rgb[1] = (byte)indexed.GetTriplet()[0];
+                    rgb[2] = (byte)indexed.GetTriplet()[1];
+                    rgb[3] = (byte)indexed.GetTriplet()[2];
                     return rgb;
                 }
             }
