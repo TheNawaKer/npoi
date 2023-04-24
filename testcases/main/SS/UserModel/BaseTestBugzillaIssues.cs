@@ -23,9 +23,9 @@ namespace TestCases.SS.UserModel
     using NPOI.SS.Util;
     using NPOI.Util;
     using NUnit.Framework;
+    using SixLabors.Fonts;
     using System;
     using System.Collections.Generic;
-    using System.Drawing;
     using System.IO;
     using System.Text;
 
@@ -347,6 +347,8 @@ namespace TestCases.SS.UserModel
             fmla.Append(")");
             return fmla.ToString();
         }
+
+
         [Test]
         public void Bug50681_TestAutoSize()
         {
@@ -460,7 +462,6 @@ namespace TestCases.SS.UserModel
             }
         }
 
-
         private double ComputeCellWidthManually(ICell cell0, IFont font)
         {
             double width;
@@ -480,14 +481,7 @@ namespace TestCases.SS.UserModel
             //TextLayout layout = new TextLayout(str.getIterator(), fontRenderContext);
             //width = ((layout.getBounds().getWidth() / 1) / 8);
             Font wfont = SheetUtil.IFont2Font(font);
-            using (var image = new Bitmap(1, 1))
-            {
-                using (var g = Graphics.FromImage(image))
-                {
-                    g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAlias;
-                    width = (int)g.MeasureString(txt, wfont, int.MaxValue).Width;
-                }
-            }
+            width = (double)TextMeasurer.Measure(txt, new TextOptions(wfont)).Width;
             return width;
         }
 
@@ -495,14 +489,7 @@ namespace TestCases.SS.UserModel
         {
             double width;
             Font wfont = SheetUtil.IFont2Font(font);
-            using (var image = new Bitmap(1, 1))
-            {
-                using (var g = Graphics.FromImage(image))
-                {
-                    g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAlias;
-                    width = (int)g.MeasureString(txt, wfont, int.MaxValue).Width;
-                }
-            }
+            width = (double)TextMeasurer.Measure(txt, new TextOptions(wfont)).Width;
             return width;
         }
 
@@ -1038,9 +1025,9 @@ namespace TestCases.SS.UserModel
 
             IWorkbook wb = _testDataProvider.CreateWorkbook();
             ICellStyle vertTop = wb.CreateCellStyle();
-            vertTop.VerticalAlignment = VerticalAlignment.Top;
+            vertTop.VerticalAlignment = NPOI.SS.UserModel.VerticalAlignment.Top;
             ICellStyle vertBottom = wb.CreateCellStyle();
-            vertBottom.VerticalAlignment = VerticalAlignment.Bottom;
+            vertBottom.VerticalAlignment = NPOI.SS.UserModel.VerticalAlignment.Bottom;
             ISheet sheet = wb.CreateSheet("Sheet 1");
             IRow row = sheet.CreateRow(0);
             ICell top = row.CreateCell(0);
@@ -1111,7 +1098,7 @@ namespace TestCases.SS.UserModel
             IFont font = wb.CreateFont();
             font.FontName = ("Arial");
             font.FontHeightInPoints = ((short)14);
-            font.Boldweight = (short)FontBoldWeight.Bold;// (Font.BOLDWEIGHT_BOLD);
+            font.IsBold = true;
             font.Color = (IndexedColors.Red.Index);
             str2.ApplyFont(font);
 
@@ -1307,7 +1294,7 @@ namespace TestCases.SS.UserModel
                 {
                     throw new InvalidOperationException("Failed for row " + i, e);
                 }
-                style.Alignment = HorizontalAlignment.Right;
+                style.Alignment = NPOI.SS.UserModel.HorizontalAlignment.Right;
                 if ((wb is HSSFWorkbook))
                 {
                     // there are some predefined styles
@@ -1673,5 +1660,102 @@ namespace TestCases.SS.UserModel
             }
         }
 
+        // bug 60197: setSheetOrder should update sheet-scoped named ranges to maintain references to the sheets before the re-order
+        [Test]
+        public virtual void bug60197_NamedRangesReferToCorrectSheetWhenSheetOrderIsChanged()
+        {
+            using (IWorkbook wb = _testDataProvider.CreateWorkbook())
+            {
+                ISheet sheet1 = wb.CreateSheet("Sheet1");
+                ISheet sheet2 = wb.CreateSheet("Sheet2");
+                ISheet sheet3 = wb.CreateSheet("Sheet3");
+
+                IName nameOnSheet1 = wb.CreateName();
+                nameOnSheet1.SheetIndex = wb.GetSheetIndex(sheet1);
+                nameOnSheet1.NameName = "NameOnSheet1";
+                nameOnSheet1.RefersToFormula = "Sheet1!A1";
+
+                IName nameOnSheet2 = wb.CreateName();
+                nameOnSheet2.SheetIndex = wb.GetSheetIndex(sheet2);
+                nameOnSheet2.NameName = "NameOnSheet2";
+                nameOnSheet2.RefersToFormula = "Sheet2!A1";
+
+                IName nameOnSheet3 = wb.CreateName();
+                nameOnSheet3.SheetIndex = wb.GetSheetIndex(sheet3);
+                nameOnSheet3.NameName = "NameOnSheet3";
+                nameOnSheet3.RefersToFormula = "Sheet3!A1";
+
+                // workbook-scoped name
+                IName name = wb.CreateName();
+                name.NameName = "WorkbookScopedName";
+                name.RefersToFormula = "Sheet2!A1";
+
+                Assert.AreEqual("Sheet1", nameOnSheet1.SheetName);
+                Assert.AreEqual("Sheet2", nameOnSheet2.SheetName);
+                Assert.AreEqual("Sheet3", nameOnSheet3.SheetName);
+                Assert.AreEqual(-1, name.SheetIndex);
+                Assert.AreEqual("Sheet2!A1", name.RefersToFormula);
+
+                // rearrange the sheets several times to make sure the names always refer to the right sheet
+                for (int i = 0; i <= 9; i++)
+                {
+                    wb.SetSheetOrder("Sheet3", i % 3);
+
+                    // Current bug in XSSF:
+                    // Call stack:
+                    //   XSSFWorkbook.write(OutputStream)
+                    //   XSSFWorkbook.commit()
+                    //   XSSFWorkbook.saveNamedRanges()
+                    // This dumps the current namedRanges to CTDefinedName and writes these to the CTWorkbook
+                    // Then the XSSFName namedRanges list is cleared and rebuilt
+                    // Thus, any XSSFName object becomes invalid after a write
+                    // This re-assignment to the XSSFNames is not necessary if wb.write is not called.
+                    nameOnSheet1 = wb.GetName("NameOnSheet1");
+                    nameOnSheet2 = wb.GetName("NameOnSheet2");
+                    nameOnSheet3 = wb.GetName("NameOnSheet3");
+                    name = wb.GetName("WorkbookScopedName");
+
+                    // The name should still refer to the same sheet after the sheets are re-ordered
+                    Assert.AreEqual(i % 3, wb.GetSheetIndex("Sheet3"));
+                    Assert.AreEqual("Sheet1", nameOnSheet1.SheetName);
+                    Assert.AreEqual("Sheet2", nameOnSheet2.SheetName);
+                    Assert.AreEqual("Sheet3", nameOnSheet3.SheetName);
+                    Assert.AreEqual(-1, name.SheetIndex);
+                    Assert.AreEqual("Sheet2!A1", name.RefersToFormula);
+
+                    // make sure the changes to the names stick after writing out the workbook
+                    using (IWorkbook wb2 = _testDataProvider.WriteOutAndReadBack(wb))
+                    {
+                        // See note above. XSSFNames become invalid after workbook write
+                        // Without reassignment here, an XmlValueDisconnectedException may occur
+                        nameOnSheet1 = wb2.GetName("NameOnSheet1");
+                        nameOnSheet2 = wb2.GetName("NameOnSheet2");
+                        nameOnSheet3 = wb2.GetName("NameOnSheet3");
+                        name = wb2.GetName("WorkbookScopedName");
+
+                        // Saving the workbook should not change the sheet names
+                        Assert.AreEqual(i % 3, wb2.GetSheetIndex("Sheet3"));
+                        Assert.AreEqual("Sheet1", nameOnSheet1.SheetName);
+                        Assert.AreEqual("Sheet2", nameOnSheet2.SheetName);
+                        Assert.AreEqual("Sheet3", nameOnSheet3.SheetName);
+                        Assert.AreEqual(-1, name.SheetIndex);
+                        Assert.AreEqual("Sheet2!A1", name.RefersToFormula);
+
+                        // Verify names in wb2
+                        nameOnSheet1 = wb2.GetName("NameOnSheet1");
+                        nameOnSheet2 = wb2.GetName("NameOnSheet2");
+                        nameOnSheet3 = wb2.GetName("NameOnSheet3");
+                        name = wb2.GetName("WorkbookScopedName");
+
+                        Assert.AreEqual(i % 3, wb2.GetSheetIndex("Sheet3"));
+                        Assert.AreEqual("Sheet1", nameOnSheet1.SheetName);
+                        Assert.AreEqual("Sheet2", nameOnSheet2.SheetName);
+                        Assert.AreEqual("Sheet3", nameOnSheet3.SheetName);
+                        Assert.AreEqual(-1, name.SheetIndex);
+                        Assert.AreEqual("Sheet2!A1", name.RefersToFormula);
+                    }
+                }
+            }
+        }
     }
 }

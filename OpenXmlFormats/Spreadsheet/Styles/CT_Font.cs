@@ -415,8 +415,6 @@ namespace NPOI.OpenXmlFormats.Spreadsheet
         }
         public int sizeOfShadowArray()
         {
-            if (this.shadowField == null)
-                return 0;
             return this.shadowField == null ? 0 : 1;
         }
         public CT_BooleanProperty AddNewShadow()
@@ -440,8 +438,6 @@ namespace NPOI.OpenXmlFormats.Spreadsheet
         }
         public int sizeOfCondenseArray()
         {
-            if (this.condenseField == null)
-                return 0;
             return this.condenseField == null ? 0 : 1;
         }
         public CT_BooleanProperty AddNewCondense()
@@ -511,6 +507,14 @@ namespace NPOI.OpenXmlFormats.Spreadsheet
             CT_Color newColor = new CT_Color();
             this.colorField.Add(newColor);
             return newColor;
+        }
+        public int AddColor(CT_Color value)
+        {
+            colorField = colorField ?? new List<CT_Color>();
+
+            colorField.Add(value);
+
+            return this.colorField.Count - 1;
         }
         #endregion color
 

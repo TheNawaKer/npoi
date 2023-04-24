@@ -148,7 +148,7 @@ namespace NPOI.XSSF.UserModel
          * See {@link NPOI.ss.usermodel.Row.MissingCellPolicy}
          */
         private MissingCellPolicy _missingCellPolicy = MissingCellPolicy.RETURN_NULL_AND_BLANK;
-
+        private bool cellFormulaValidation = true;
         /**
          * array of pictures for this workbook
          */
@@ -596,6 +596,7 @@ namespace NPOI.XSSF.UserModel
             else
             {
                 ValidateSheetName(newName);
+                WorkbookUtil.ValidateSheetName(newName);
             }
 
             XSSFSheet clonedSheet = CreateSheet(newName) as XSSFSheet;
@@ -624,7 +625,7 @@ namespace NPOI.XSSF.UserModel
                     if (pr.TargetMode == TargetMode.External)
                     {
                         clonedSheet.GetPackagePart().AddExternalRelationship
-                            (pr.TargetUri.ToString(), pr.RelationshipType, null);
+                            (pr.TargetUri.OriginalString, pr.RelationshipType, null);
                     }
                 }
             }
@@ -635,10 +636,11 @@ namespace NPOI.XSSF.UserModel
 
             try
             {
-                using (MemoryStream out1 = new MemoryStream())
+                using (MemoryStream ms = RecyclableMemory.GetStream())
                 {
-                    srcSheet.Write(out1);
-                    clonedSheet.Read(new MemoryStream(out1.ToArray()));
+                    srcSheet.Write(ms, true);
+                    ms.Position = 0;
+                    clonedSheet.Read(ms);
                 }
             }
             catch (IOException e)
@@ -728,7 +730,7 @@ namespace NPOI.XSSF.UserModel
                     uniqueIndex++;
                     baseName = srcName.Substring(0, bracketPos).Trim();
                 }
-                catch (FormatException e)
+                catch (FormatException)
                 {
                     // contents of brackets not numeric
                 }
@@ -880,9 +882,6 @@ namespace NPOI.XSSF.UserModel
             }
             ValidateSheetName(sheetname);
 
-
-            // YK: Mimic Excel and silently tRuncate sheet names longer than 31 characters
-            if (sheetname.Length > 31) sheetname = sheetname.Substring(0, 31);
             WorkbookUtil.ValidateSheetName(sheetname);
 
             CT_Sheet sheet = AddSheet(sheetname);
@@ -1638,8 +1637,6 @@ namespace NPOI.XSSF.UserModel
             ValidateSheetIndex(sheetIndex);
             String oldSheetName = GetSheetName(sheetIndex);
 
-            // YK: Mimic Excel and silently tRuncate sheet names longer than 31 characters
-            if (sheetname != null && sheetname.Length > 31) sheetname = sheetname.Substring(0, 31);
             WorkbookUtil.ValidateSheetName(sheetname);
 
             // Do nothing if no change
@@ -1668,6 +1665,7 @@ namespace NPOI.XSSF.UserModel
             XSSFSheet sheet = sheets[idx];
             sheets.RemoveAt(idx);
             sheets.Insert(pos, sheet);
+
             // Reorder CT_Sheets
             CT_Sheets ct = workbook.sheets;
             CT_Sheet cts = ct.GetSheetArray(idx).Copy();
@@ -1677,34 +1675,75 @@ namespace NPOI.XSSF.UserModel
 
             //notify sheets
             List<CT_Sheet> sheetArray = ct.sheet;
-            for (int i = 0; i < sheets.Count; i++)
+            for (int i = 0; i < sheetArray.Count; i++)
             {
                 sheets[i].sheet = sheetArray[i];
             }
 
+            UpdateNamedRangesAfterSheetReorder(idx, pos);
+            UpdateActiveSheetAfterSheetReorder(idx, pos);
+        }
+
+        /**
+         * update sheet-scoped named ranges in this workbook after changing the sheet order
+         * of a sheet at oldIndex to newIndex.
+         * Sheets between these indices will move left or right by 1.
+         *
+         * @param oldIndex the original index of the re-ordered sheet
+         * @param newIndex the new index of the re-ordered sheet
+         */
+        private void UpdateNamedRangesAfterSheetReorder(int oldIndex, int newIndex)
+        {
+            // update sheet index of sheet-scoped named ranges
+            foreach (XSSFName name in namedRanges)
+            {
+                int i = name.SheetIndex;
+                // name has sheet-level scope
+                if (i != -1)
+                {
+                    // name refers to this sheet
+                    if (i == oldIndex)
+                    {
+                        name.SheetIndex = newIndex;
+                    }
+                    // if oldIndex > newIndex then this sheet moved left and sheets between newIndex and oldIndex moved right
+                    else if (newIndex <= i && i < oldIndex)
+                    {
+                        name.SheetIndex = i + 1;
+                    }
+                    // if oldIndex < newIndex then this sheet moved right and sheets between oldIndex and newIndex moved left
+                    else if (oldIndex < i && i <= newIndex)
+                    {
+                        name.SheetIndex = i - 1;
+                    }
+                }
+            }
+        }
+
+        private void UpdateActiveSheetAfterSheetReorder(int oldIndex, int newIndex)
+        {
             // adjust active sheet if necessary
             int active = ActiveSheetIndex;
-            if (active == idx)
+            if (active == oldIndex)
             {
-                // Moved sheet was the active one
-                SetActiveSheet(pos);
+                // moved sheet was the active one
+                SetActiveSheet(newIndex);
             }
-            else if ((active < idx && active < pos) ||
-                  (active > idx && active > pos))
+            else if ((active < oldIndex && active < newIndex) ||
+                     (active > oldIndex && active > newIndex))
             {
                 // not affected
             }
-            else if (pos > idx)
+            else if (newIndex > oldIndex)
             {
-                // Moved sheet was below before and is above now => active is one less
+                // moved sheet was below before and is above now => active is one less
                 SetActiveSheet(active - 1);
             }
             else
             {
-                // remaining case: Moved sheet was higher than active before and is lower now => active is one more
+                // remaining case: moved sheet was higher than active before and is lower now => active is one more
                 SetActiveSheet(active + 1);
             }
-
         }
 
         /**
@@ -2362,7 +2401,11 @@ namespace NPOI.XSSF.UserModel
                 this.pivotTables = value;
             }
         }
-
+        public bool CellFormulaValidation
+        {
+            get { return this.cellFormulaValidation; }
+            set { this.cellFormulaValidation = false; }
+        }
 
         #region IWorkbook Members
 
@@ -2384,11 +2427,6 @@ namespace NPOI.XSSF.UserModel
             pictures.Add(img);
             return imageNumber - 1;
 
-        }
-
-        public bool Dispose()
-        {
-            throw new NotImplementedException();
         }
 
         public XSSFWorkbookType WorkbookType
@@ -2552,6 +2590,11 @@ namespace NPOI.XSSF.UserModel
         }
 
         #endregion
+
+        public void Dispose()
+        {
+            this.Close();
+        }
     }
 }
 

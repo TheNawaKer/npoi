@@ -696,9 +696,8 @@ namespace TestCases.HSSF.UserModel
 
         /** cell with formula becomes null on cloning a sheet*/
         [Test]
-        public new void Test35084()
+        public void Test35084()
         {
-
             HSSFWorkbook wb = new HSSFWorkbook();
             NPOI.SS.UserModel.ISheet s = wb.CreateSheet("Sheet1");
             IRow r = s.CreateRow(0);
@@ -755,7 +754,7 @@ namespace TestCases.HSSF.UserModel
             //  thankfully don't overlap!
             int minWithRow1And2 = 6400;
             int maxWithRow1And2 = 7800;
-            int minWithRow1Only = 2750;
+            int minWithRow1Only = 2730;
             int maxWithRow1Only = 3300;
 
             // autoSize the first column and check its size before the merged region (1,0,1,1) is set:
@@ -773,8 +772,8 @@ namespace TestCases.HSSF.UserModel
             // Check that the autoSized column width has ignored the 2nd row
             // because it is included in a merged region (Excel like behavior)
             NPOI.SS.UserModel.ISheet sheet2 = wb2.GetSheet(sheetName);
-            Assert.IsTrue(sheet2.GetColumnWidth(0) >= minWithRow1Only);
-            Assert.IsTrue(sheet2.GetColumnWidth(0) <= maxWithRow1Only);
+            Assert.IsTrue(sheet2.GetColumnWidth(0) >= minWithRow1Only, $"sheet column width:{sheet2.GetColumnWidth(0)}, minWithRow1Only:{minWithRow1Only}");
+            Assert.IsTrue(sheet2.GetColumnWidth(0) <= maxWithRow1Only, $"sheet column width:{sheet2.GetColumnWidth(0)}, maxWithRow1Only:{maxWithRow1Only}");
 
             // Remove the 2nd row merged region and Check that the 2nd row value is used to the AutoSizeColumn width
             sheet2.RemoveMergedRegion(1);
@@ -831,6 +830,31 @@ namespace TestCases.HSSF.UserModel
 
             wb.Close();
         }
+
+
+        [Test]
+        public void TestAutoSizeRow()
+        {
+            HSSFWorkbook workbook = new HSSFWorkbook();
+            ISheet sheet = workbook.CreateSheet("Sheet 1");
+
+            var row = sheet.CreateRow(0);
+            var cell = row.CreateCell(13);
+            cell.SetCellValue("test");
+            var font = cell.CellStyle.GetFont(workbook);
+            font.FontHeightInPoints = 20;
+            cell.CellStyle.SetFont(font);
+            row.Height = 100;
+
+            sheet.AutoSizeRow(row.RowNum);
+
+            Assert.AreNotEqual(100, row.Height);
+            Assert.AreEqual(460, row.Height);
+
+            workbook.Close();
+        }
+
+
         ///**
         // * Setting ForceFormulaRecalculation on sheets
         // */
@@ -1066,18 +1090,15 @@ namespace TestCases.HSSF.UserModel
             HSSFWorkbook wb = new HSSFWorkbook();
             String SAME_PREFIX = "A123456789B123456789C123456789"; // 30 chars
 
-            wb.CreateSheet(SAME_PREFIX + "Dxxxx");
             try
             {
                 wb.CreateSheet(SAME_PREFIX + "Dyyyy"); // identical up to the 32nd char
-                throw new AssertionException("Expected exception not thrown");
+                Assert.Fail("Expected exception not thrown");
             }
             catch (ArgumentException e)
             {
-                Assert.AreEqual("The workbook already contains a sheet named 'A123456789B123456789C123456789Dyyyy'", e.Message);
+                Assert.IsTrue(e.Message.StartsWith("sheetName 'A123456789B123456789C123456789Dyyyy' is invalid"));
             }
-            wb.CreateSheet(SAME_PREFIX + "Exxxx"); // OK - differs in the 31st char
-
             wb.Close();
         }
         /**

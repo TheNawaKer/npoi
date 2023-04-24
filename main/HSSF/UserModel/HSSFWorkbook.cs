@@ -460,20 +460,64 @@ namespace NPOI.HSSF.UserModel
             }
 
             workbook.UpdateNamesAfterCellShift(shifter);
+            UpdateNamedRangesAfterSheetReorder(oldSheetIndex, pos);
 
+            UpdateActiveSheetAfterSheetReorder(oldSheetIndex, pos);
+        }
+
+        /**
+         * copy-pasted from XSSFWorkbook#updateNamedRangesAfterSheetReorder(int, int)
+         * <p>
+         * update sheet-scoped named ranges in this workbook after changing the sheet order
+         * of a sheet at oldIndex to newIndex.
+         * Sheets between these indices will move left or right by 1.
+         *
+         * @param oldIndex the original index of the re-ordered sheet
+         * @param newIndex the new index of the re-ordered sheet
+         */
+        private void UpdateNamedRangesAfterSheetReorder(int oldIndex, int newIndex)
+        {
+            // update sheet index of sheet-scoped named ranges
+            foreach (HSSFName name in names)
+            {
+                int i = name.SheetIndex;
+                // name has sheet-level scope
+                if (i != -1)
+                {
+                    // name refers to this sheet
+                    if (i == oldIndex)
+                    {
+                        name.SheetIndex = newIndex;
+                    }
+                    // if oldIndex > newIndex then this sheet moved left and sheets between newIndex and oldIndex moved right
+                    else if (newIndex <= i && i < oldIndex)
+                    {
+                        name.SheetIndex = i + 1;
+                    }
+                    // if oldIndex < newIndex then this sheet moved right and sheets between oldIndex and newIndex moved left
+                    else if (oldIndex < i && i <= newIndex)
+                    {
+                        name.SheetIndex = i - 1;
+                    }
+                }
+            }
+        }
+
+        private void UpdateActiveSheetAfterSheetReorder(int oldIndex, int newIndex)
+        {
             // adjust active sheet if necessary
             int active = ActiveSheetIndex;
-            if (active == oldSheetIndex)
+            if (active == oldIndex)
             {
                 // moved sheet was the active one
-                SetActiveSheet(pos);
+                SetActiveSheet(newIndex);
             }
-            else if ((active < oldSheetIndex && active < pos) ||
-                  (active > oldSheetIndex && active > pos))
+            else if ((active < oldIndex && active < newIndex) ||
+                     (active > oldIndex && active > newIndex))
             {
                 // not affected
             }
-            else if (pos > oldSheetIndex)
+            else if (newIndex > oldIndex)
             {
                 // moved sheet was below before and is above now => active is one less
                 SetActiveSheet(active - 1);
@@ -674,6 +718,7 @@ namespace NPOI.HSSF.UserModel
                 throw new ArgumentException("The workbook already contains a sheet named '" + name + "'");
             }
             ValidateSheetIndex(sheetIx);
+            WorkbookUtil.ValidateSheetName(name);
             workbook.SetSheetName(sheetIx, name);
         }
 
@@ -877,7 +922,9 @@ namespace NPOI.HSSF.UserModel
             if (workbook.ContainsSheetName(sheetname, _sheets.Count))
                 throw new ArgumentException("The workbook already contains a sheet named '" + sheetname + "'");
 
-            HSSFSheet sheet = new HSSFSheet(this);
+           WorkbookUtil.ValidateSheetName(sheetname);
+
+           HSSFSheet sheet = new HSSFSheet(this);
 
             workbook.SetSheetName(_sheets.Count, sheetname);
             _sheets.Add(sheet);
@@ -1346,19 +1393,7 @@ namespace NPOI.HSSF.UserModel
                 fs.Close();
             }
         }
-    
-        /// <summary>
-        /// Write out this workbook to an Outputstream.  Constructs
-        /// a new POI POIFSFileSystem, passes in the workbook binary representation  and
-        /// Writes it out.
-        /// 
-        /// If {@code stream} is a {@link java.io.FileOutputStream} on a networked drive
-        /// or has a high cost/latency associated with each written byte,
-        /// consider wrapping the OutputStream in a {@link java.io.BufferedOutputStream}
-        /// to improve write performance.
-        /// 
-        /// </summary>
-        /// <param name="stream">the java OutputStream you wish to Write the XLS to</param>
+
         public override void Write(Stream stream)
         {
             NPOIFSFileSystem fs = new NPOIFSFileSystem();
@@ -1371,6 +1406,16 @@ namespace NPOI.HSSF.UserModel
             {
                 fs.Close();
             }
+        }
+        /// <summary>
+        /// Write out this workbook to an Outputstream.  Constructs
+        /// a new POI POIFSFileSystem, passes in the workbook binary representation  and
+        /// Writes it out.
+        /// </summary>
+        /// <param name="stream">the stream you wish to Write the XLS to</param>
+        public void Write(Stream stream, bool leaveOpen)
+        {
+            this.Write(stream);
         }
 
         /** Writes the workbook out to a brand new, empty POIFS */
@@ -1403,7 +1448,7 @@ namespace NPOI.HSSF.UserModel
             //  going to be preserving nodes
             List<string> excepts = new List<string>(1);
 
-            using (MemoryStream newMemoryStream = new MemoryStream(GetBytes()))
+            using (MemoryStream newMemoryStream = RecyclableMemory.GetStream(GetBytes()))
             {
                 // Write out the Workbook stream
                 fs.CreateDocument(newMemoryStream, "Workbook");
@@ -2028,9 +2073,11 @@ namespace NPOI.HSSF.UserModel
                 }
             }
 
-            MemoryStream bos = new MemoryStream();
-            poiData.WriteFileSystem(bos);
-            return AddOlePackage(bos.ToArray(), label, fileName, command);
+            using (MemoryStream bos = RecyclableMemory.GetStream())
+            {
+                poiData.WriteFileSystem(bos);
+                return AddOlePackage(bos.ToArray(), label, fileName, command);
+            }
         }
 
         public int AddOlePackage(byte[] oleData, String label, String fileName, String command)
@@ -2062,9 +2109,11 @@ namespace NPOI.HSSF.UserModel
             oleDir.CreateDocument("\u0001Ole", new MemoryStream(oleBytes));
 
             Ole10Native oleNative = new Ole10Native(label, fileName, command, oleData);
-            MemoryStream bos = new MemoryStream();
-            oleNative.WriteOut(bos);
-            oleDir.CreateDocument(Ole10Native.OLE10_NATIVE, new MemoryStream(bos.ToArray()));
+            using (MemoryStream bos = RecyclableMemory.GetStream())
+            {
+                oleNative.WriteOut(bos);
+                oleDir.CreateDocument(Ole10Native.OLE10_NATIVE, new MemoryStream(bos.ToArray()));
+            }
 
             return storageId;
         }
@@ -2324,10 +2373,6 @@ namespace NPOI.HSSF.UserModel
         {
             return this._sheets.Remove((HSSFSheet)item);
         }
-        public bool Dispose()
-        {
-            throw new NotImplementedException();
-        }
 
         /// <summary>
         /// Gets a bool value that indicates whether the date systems used in the workbook starts in 1904.
@@ -2338,6 +2383,11 @@ namespace NPOI.HSSF.UserModel
         public bool IsDate1904()
         {
             return Workbook.IsUsing1904DateWindowing;
+        }
+
+        public void Dispose()
+        {
+            this.Close();
         }
     }
 }

@@ -1375,8 +1375,8 @@ namespace NPOI.XSSF.Streaming
 
             var firstRowNum = _rows.Keys.Min();
             // Update the best fit column widths for auto-sizing just before the rows are flushed
-            // _autoSizeColumnTracker.UpdateColumnWidths(row);
             var firstRow = _rows[firstRowNum];
+            _autoSizeColumnTracker.Value?.UpdateColumnWidths(firstRow);
             _writer.WriteRow(firstRowNum, firstRow);
             _rows.Remove(firstRowNum);
             lastFlushedRowNumber = firstRowNum;
@@ -1425,6 +1425,16 @@ namespace NPOI.XSSF.Streaming
             }
         }
         public void CopyTo(IWorkbook dest, string name, bool copyStyle, bool keepFormulas)
+        {
+            throw new NotImplementedException();
+        }
+
+        public void AutoSizeRow(int row)
+        {
+            throw new NotImplementedException();
+        }
+
+        public void AutoSizeRow(int row, bool useMergedCells)
         {
             throw new NotImplementedException();
         }

@@ -21,8 +21,8 @@ using NPOI.XSSF;
 using NPOI.XSSF.Model;
 using NPOI.XSSF.UserModel;
 using NUnit.Framework;
+using SixLabors.ImageSharp;
 using System;
-using System.Drawing;
 
 namespace TestCases.XSSF.UserModel
 {
@@ -127,7 +127,7 @@ namespace TestCases.XSSF.UserModel
                 rt.ApplyFont(0, 10, (short)1);
                 Assert.Fail("Fails without styles in the table");
             }
-            catch (ArgumentOutOfRangeException e)
+            catch (ArgumentOutOfRangeException )
             {
                 // expected
             }

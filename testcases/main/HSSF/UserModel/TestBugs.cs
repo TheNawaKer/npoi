@@ -44,9 +44,8 @@ namespace TestCases.HSSF.UserModel
     using NPOI.HSSF.Extractor;
     using NPOI.HSSF.Record.Crypto;
     using NPOI.HSSF;
-    using System.Drawing;
     using System.Net;
-    using System.Drawing.Imaging;
+    using SixLabors.ImageSharp;
 
     /**
      * Testcases for bugs entered in bugzilla
@@ -3356,7 +3355,7 @@ namespace TestCases.HSSF.UserModel
             {
                 WebClient client = new WebClient();
                 MemoryStream ms = new MemoryStream(client.DownloadData(structURL));
-                bimage = Bitmap.FromStream(ms);
+                bimage = Image.Load(ms);
                 ms.Close();
             }
             catch (WebException)
@@ -3367,7 +3366,7 @@ namespace TestCases.HSSF.UserModel
             // Convert BufferedImage to byte[]
             ByteArrayOutputStream imageBAOS = new ByteArrayOutputStream();
             //ImageIO.write(bimage, "jpeg", imageBAOS);
-            bimage.Save(imageBAOS, ImageFormat.Jpeg);
+            bimage.SaveAsJpeg(imageBAOS);
             imageBAOS.Flush();
             byte[] imageBytes = imageBAOS.ToByteArray();
             imageBAOS.Close();
@@ -3484,6 +3483,34 @@ namespace TestCases.HSSF.UserModel
             //wb.write(fos);
             //fos.Close();
             wb.Close();
+        }
+
+
+        // follow https://svn.apache.org/viewvc?view=revision&revision=1896552 to write a unit test for this fix.
+        [Test]
+        public void Test52447()
+        {
+            IWorkbook wb=null;
+            try
+            {
+                wb = HSSFTestDataSamples.OpenSampleWorkbook("52447.xls");
+            } catch { 
+                Assert.IsNotNull(wb);
+            }
+        }
+
+        [Test]
+        public void TestAmazonDownloadFile()
+        {
+            IWorkbook wb = null;
+            try
+            {
+                wb = HSSFTestDataSamples.OpenSampleWorkbook("ca_apparel_browse_tree_guide._TTH_.xls");
+            }
+            catch
+            {
+                Assert.IsNotNull(wb);
+            }
         }
     }
 }

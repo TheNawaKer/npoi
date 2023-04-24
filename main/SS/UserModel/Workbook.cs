@@ -54,7 +54,7 @@ namespace NPOI.SS.UserModel
     /// This interface is shared between the implementation specific to xls and xlsx.
     /// This way it is possible to access Excel workbooks stored in both formats.
     /// </summary>
-    public interface IWorkbook : ICloseable
+    public interface IWorkbook : ICloseable, IDisposable
     {
 
         /// <summary>
@@ -241,7 +241,7 @@ namespace NPOI.SS.UserModel
         /// Write out this workbook to an OutPutstream.
         /// </summary>
         /// <param name="stream">the stream you wish to write to</param>
-        void Write(Stream stream);
+        void Write(Stream stream, bool leaveOpen);
 
         /// <summary>
         /// the total number of defined names in this workbook
@@ -444,12 +444,6 @@ namespace NPOI.SS.UserModel
         bool IsDate1904();
 
         void Close();
-
-        /// <summary>
-        /// Attention, a n'utiliser que pour la classe SXSSFWorkbook, sinon exception/>
-        /// </summary>
-        /// <returns></returns>
-        bool Dispose();
 
         /// <summary>
         /// Returns the spreadsheet version (EXCLE97) of this workbook

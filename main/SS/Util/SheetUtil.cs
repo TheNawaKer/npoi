@@ -19,10 +19,10 @@ namespace NPOI.SS.Util
 {
 	using System;
 
-	using NPOI.SS.UserModel;
-	using System.Drawing;
-	using System.Windows.Forms;
-	using System.Collections.Generic;
+    using NPOI.SS.UserModel;
+    using System.Collections.Generic;
+    using SixLabors.Fonts;
+    using System.Linq;
 
 	/**
 	 * Helper methods for when working with Usermodel sheets
@@ -159,8 +159,8 @@ namespace NPOI.SS.Util
             for (int i = 0; i < sourceSheet.NumMergedRegions; i++)
             {
                 CellRangeAddress cellRangeAddress = sourceSheet.GetMergedRegion(i);
-                
-                if (cellRangeAddress!=null && cellRangeAddress.FirstRow == sourceRow.RowNum)
+
+                if (cellRangeAddress != null && cellRangeAddress.FirstRow == sourceRow.RowNum)
                 {
                     CellRangeAddress newCellRangeAddress = new CellRangeAddress(newRow.RowNum,
                             (newRow.RowNum +
@@ -171,7 +171,7 @@ namespace NPOI.SS.Util
                     targetSheet.AddMergedRegion(newCellRangeAddress);
                 }
             }
-            return newRow;           
+            return newRow;
         }
         public static IRow CopyRow(ISheet sheet, int sourceRowIndex, int targetRowIndex)
         {
@@ -265,6 +265,169 @@ namespace NPOI.SS.Util
             return newRow;
         }
 
+        public static double GetRowHeight(IRow row, bool useMergedCells, int firstColumnIdx, int lastColumnIdx)
+        {
+            double width = -1;
+
+            for (int cellIdx = firstColumnIdx; cellIdx <= lastColumnIdx; ++cellIdx)
+            {
+                ICell cell = row.GetCell(cellIdx);
+                if (row != null && cell != null)
+                {
+                    double cellWidth = GetCellHeight(cell, useMergedCells);
+                    width = Math.Max(width, cellWidth);
+                }
+            }
+
+            return width;
+        }
+
+        public static double GetRowHeight(ISheet sheet, int rowIdx, bool useMergedCells, int firstColumnIdx, int lastColumnIdx)
+        {
+            IRow row = sheet.GetRow(rowIdx);
+            return GetRowHeight(row, useMergedCells, firstColumnIdx, lastColumnIdx);
+        }
+
+        public static double GetRowHeight(IRow row, bool useMergedCells)
+        {
+            if (row == null)
+            {
+                return -1;
+            }
+
+            double rowHeight = -1;
+
+            foreach (var cell in row.Cells)
+            {
+                double cellHeight = GetCellHeight(cell, useMergedCells);
+                rowHeight = Math.Max(rowHeight, cellHeight);
+            }
+
+            return rowHeight;
+        }
+
+        public static double GetRowHeight(ISheet sheet, int rowIdx, bool useMergedCells)
+        {
+            IRow row = sheet.GetRow(rowIdx);
+
+            return GetRowHeight(row, useMergedCells);
+        }
+
+        public static double GetCellHeight(ICell cell, bool useMergedCells)
+        {
+            ICell cellToMeasure = useMergedCells ? GetFirstCellFromMergedRegion(cell) : cell;
+
+            double stringHeight = GetActualHeight(cellToMeasure);
+            int numberOfRowsInMergedRegion = useMergedCells ? GetNumberOfRowsInMergedRegion(cellToMeasure) : 1;
+
+            return GetCellConetntHeight(stringHeight, numberOfRowsInMergedRegion);
+        }
+
+        private static ICell GetFirstCellFromMergedRegion(ICell cell)
+        {
+            foreach (var region in cell.Sheet.MergedRegions)
+            {
+                if (region.IsInRange(cell.RowIndex, cell.ColumnIndex))
+                {
+                    return cell.Sheet.GetRow(region.FirstRow).GetCell(region.FirstColumn);
+                }
+            }
+
+            return cell;
+        }
+
+        private static double GetActualHeight(ICell cell)
+        {
+            string stringValue = GetCellStringValue(cell);
+            Font windowsFont = GetWindowsFont(cell);
+
+            if (cell.CellStyle.Rotation != 0)
+            {
+                return GetRotatedContentHeight(cell, stringValue, windowsFont);
+            }
+
+            return GetContentHeight(stringValue, windowsFont);
+        }
+
+        private static int GetNumberOfRowsInMergedRegion(ICell cell)
+        {
+            foreach (var region in cell.Sheet.MergedRegions)
+            {
+                if (region.IsInRange(cell.RowIndex, cell.ColumnIndex))
+                {
+                    return 1 + region.LastRow - region.FirstRow;
+                }
+            }
+
+            return 1;
+        }
+
+        private static double GetCellConetntHeight(double actualHeight, int numberOfRowsInMergedRegion)
+        {
+            var correction = 1.1;
+            return Math.Max(-1, actualHeight / numberOfRowsInMergedRegion * correction);
+        }
+
+        private static string GetCellStringValue(ICell cell)
+        {
+            CellType cellType = cell.CellType == CellType.Formula ? cell.CachedFormulaResultType : cell.CellType;
+
+            if (cellType == CellType.String)
+            {
+                return cell.RichStringCellValue.String;
+            }
+
+            if (cellType == CellType.Boolean)
+            {
+                return cell.BooleanCellValue.ToString().ToUpper() + defaultChar;
+            }
+
+            if (cellType == CellType.Numeric)
+            {
+                string stringValue;
+
+                try
+                {
+                    DataFormatter formatter = new DataFormatter();
+                    stringValue = formatter.FormatCellValue(cell, dummyEvaluator);
+                }
+                catch
+                {
+                    stringValue = cell.NumericCellValue.ToString();
+                }
+
+                return stringValue + defaultChar;
+            }
+
+            return null;
+        }
+
+        private static Font GetWindowsFont(ICell cell)
+        {
+            var wb = cell.Sheet.Workbook;
+            var style = cell.CellStyle;
+            var font = wb.GetFontAt(style.FontIndex);
+
+            return IFont2Font(font);
+        }
+
+        private static double GetRotatedContentHeight(ICell cell, string stringValue, Font windowsFont)
+        {
+            var angle = cell.CellStyle.Rotation * 2.0 * Math.PI / 360.0;
+            var measureResult = TextMeasurer.Measure(stringValue, new TextOptions(windowsFont));
+
+            var x1 = Math.Abs(measureResult.Height * Math.Cos(angle));
+            var x2 = Math.Abs(measureResult.Width * Math.Sin(angle));
+
+            return Math.Round(x1 + x2, 0, MidpointRounding.ToEven);
+        }
+
+        private static double GetContentHeight(string stringValue, Font windowsFont)
+        {
+            var measureResult = TextMeasurer.Measure(stringValue, new TextOptions(windowsFont));
+            
+            return Math.Round(measureResult.Height, 0, MidpointRounding.ToEven);
+        }
 
         /**
          * Compute width of a single cell
@@ -307,20 +470,15 @@ namespace NPOI.SS.Util
 
 			IFont font = wb.GetFontAt(style.FontIndex);
 
-			//AttributedString str;
-			//TextLayout layout;
-
-			double width = -1;
-			using (Bitmap bmp = new Bitmap(1, 1))
-			using (Graphics g = Graphics.FromImage(bmp))
-			{
-				if (cellType == CellType.String)
-				{
-					IRichTextString rt = cell.RichStringCellValue;
-					String[] lines = rt.String.Replace(' ', defaultChar).Split("\n".ToCharArray());
-					for (int i = 0; i < lines.Length; i++)
-					{
-						String txt = lines[i] + defaultChar;
+            double width = -1;
+            {
+                if (cellType == CellType.String)
+                {
+                    IRichTextString rt = cell.RichStringCellValue;
+                    String[] lines = rt.String.Split("\n".ToCharArray());
+                    for (int i = 0; i < lines.Length; i++)
+                    {
+                        String txt = lines[i] + defaultChar;
 
                         //AttributedString str = new AttributedString(txt);
                         //copyAttributes(font, str, 0, txt.length());
@@ -330,7 +488,7 @@ namespace NPOI.SS.Util
                             // TODO: support rich text fragments
                         }
 
-                        width = GetCellWidth(defaultCharWidth, colspan, style, width, txt, g, windowsFont, cell);
+                        width = GetCellWidth(defaultCharWidth, colspan, style, width, txt, windowsFont, cell);
                     }
                 }
                 else
@@ -343,7 +501,7 @@ namespace NPOI.SS.Util
                         {
                             sval = formatter.FormatCellValue(cell, dummyEvaluator);
                         }
-                        catch (Exception)
+                        catch
                         {
                             sval = cell.NumericCellValue.ToString();
                         }
@@ -358,7 +516,7 @@ namespace NPOI.SS.Util
                         //str = new AttributedString(txt);
                         //copyAttributes(font, str, 0, txt.length());
                         windowsFont = IFont2Font(font);
-                        width = GetCellWidth(defaultCharWidth, colspan, style, width, txt, g, windowsFont, cell);
+                        width = GetCellWidth(defaultCharWidth, colspan, style, width, txt, windowsFont, cell);
                     }
                 }
             }
@@ -366,14 +524,14 @@ namespace NPOI.SS.Util
         }
 
         private static double GetCellWidth(int defaultCharWidth, int colspan,
-            ICellStyle style, double width, string str, Graphics g, Font windowsFont, ICell cell)
+            ICellStyle style, double width, string str, Font windowsFont, ICell cell)
         {
             //Rectangle bounds;
             double actualWidth;
+            FontRectangle sf = TextMeasurer.Measure(str, new TextOptions(windowsFont));
             if (style.Rotation != 0)
             {
                 double angle = style.Rotation * 2.0 * Math.PI / 360.0;
-                SizeF sf = g.MeasureString(str, windowsFont);
                 double x1 = Math.Abs(sf.Height * Math.Sin(angle));
                 double x2 = Math.Abs(sf.Width * Math.Cos(angle));
                 actualWidth = Math.Round(x1 + x2, 0, MidpointRounding.ToEven);
@@ -382,14 +540,16 @@ namespace NPOI.SS.Util
             else
             {
                 //bounds = layout.getBounds();
-                actualWidth = Math.Round(g.MeasureString(str, windowsFont, int.MaxValue, StringFormat.GenericTypographic).Width, 0, MidpointRounding.ToEven);                
+                actualWidth = Math.Round(sf.Width, 0, MidpointRounding.ToEven);                
             }
             // entireWidth accounts for leading spaces which is excluded from bounds.getWidth()
             //double frameWidth = bounds.getX() + bounds.getWidth();
             //width = Math.max(width, ((frameWidth / colspan) / defaultCharWidth) + style.getIndention());
-            width = Math.Max(width, (actualWidth / colspan / defaultCharWidth) + cell.CellStyle.Indention);
+            var correction = 1.1;
+            width = Math.Max(width, (actualWidth / colspan / defaultCharWidth * correction) + cell.CellStyle.Indention);
             return width;
         }
+
         // /**
         // * Drawing context to measure text
         // */
@@ -415,12 +575,16 @@ namespace NPOI.SS.Util
          * @param useMergedCells    whether to use merged cells
          * @param firstRow  0-based index of the first row to consider (inclusive)
          * @param lastRow   0-based index of the last row to consider (inclusive)
+         * @param maxRows   limit the scope to maxRows rows to speed up the function, or leave 0 (optional)
          * @return  the width in pixels or -1 if cell is empty
          */
-        public static double GetColumnWidth(ISheet sheet, int column, bool useMergedCells, int firstRow, int lastRow)
+        public static double GetColumnWidth(ISheet sheet, int column, bool useMergedCells, int firstRow, int lastRow, int maxRows = 0)
         {
             DataFormatter formatter = new DataFormatter();
             int defaultCharWidth = GetDefaultCharWidth(sheet.Workbook);
+
+            // No need to explore the whole sheet: explore only the first maxRows lines
+            if (maxRows > 0 && lastRow - firstRow > maxRows) lastRow = firstRow + maxRows;
 
             double width = -1;
             for (int rowIdx = firstRow; rowIdx <= lastRow; ++rowIdx)
@@ -449,17 +613,8 @@ namespace NPOI.SS.Util
             //copyAttributes(defaultFont, str, 0, 1);
             //TextLayout layout = new TextLayout(str.getIterator(), fontRenderContext);
             //int defaultCharWidth = (int)layout.getAdvance();
-            int defaultCharWidth = 0;
             Font font = IFont2Font(defaultFont);
-            using (var image = new Bitmap(1, 1))
-            {
-                using (var g = Graphics.FromImage(image))
-                {
-                    g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAlias;
-                    defaultCharWidth = (int)g.MeasureString(new String(defaultChar, 1), font, int.MaxValue, StringFormat.GenericTypographic).Width;
-                }
-            }
-            return defaultCharWidth;
+            return (int)Math.Ceiling(TextMeasurer.Measure(new string(defaultChar, 1), new TextOptions(font)).Width);
         }
 
         /**
@@ -525,16 +680,23 @@ namespace NPOI.SS.Util
         //    str.AddAttribute(TextAttribute.SIZE, (float)font.FontHeightInPoints);
         //    if (font.Boldweight == (short)FontBoldWeight.BOLD) str.AddAttribute(TextAttribute.WEIGHT, TextAttribute.WEIGHT_BOLD, startIdx, endIdx);
         //    if (font.IsItalic) str.AddAttribute(TextAttribute.POSTURE, TextAttribute.POSTURE_OBLIQUE, startIdx, endIdx);
-        //    if (font.Underline == (byte)FontUnderlineType.SINGLE) str.AddAttribute(TextAttribute.UNDERLINE, TextAttribute.UNDERLINE_ON, startIdx, endIdx);           
+        //    TODO-Fonts: not supported: if (font.Underline == (byte)FontUnderlineType.SINGLE) str.AddAttribute(TextAttribute.UNDERLINE, TextAttribute.UNDERLINE_ON, startIdx, endIdx);           
         //}
-
+        
         /// <summary>
         /// Convert HSSFFont to Font.
         /// </summary>
         /// <param name="font1">The font.</param>
         /// <returns></returns>
+        /// <exception cref="FontException">Will throw this if no font are 
+        /// found by SixLabors in the current environment.</exception>
         internal static Font IFont2Font(IFont font1)
         {
+            if (SystemFonts.Families == null || SystemFonts.Families.Count() == 0)
+            {
+                throw new FontException("No fonts found installed on the machine.");
+            }
+
             FontStyle style = FontStyle.Regular;
             if (font1.IsBold)
             {
@@ -542,11 +704,27 @@ namespace NPOI.SS.Util
             }
             if (font1.IsItalic)
                 style |= FontStyle.Italic;
+
+            /* TODO-Fonts: not supported
             if (font1.Underline == FontUnderlineType.Single)
             {
                 style |= FontStyle.Underline;
             }
-            Font font = new Font(font1.FontName, (float)font1.FontHeightInPoints, style, GraphicsUnit.Point);
+            */
+
+            // Try to find font in system fonts. If we can not find out,
+            // use "Arial". TODO-Fonts: More fallbacks.
+            SixLabors.Fonts.FontFamily fontFamily;
+
+            if (false == SystemFonts.TryGet(font1.FontName, out fontFamily))
+            {
+                if (false == SystemFonts.TryGet("Arial", out fontFamily))
+                {
+                    fontFamily = SystemFonts.Families.First();
+                }
+            }
+            
+            Font font = new Font(fontFamily, (float)font1.FontHeightInPoints, style);
             return font;
         }
         /// <summary>

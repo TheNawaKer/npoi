@@ -1273,6 +1273,23 @@ namespace NPOI.OpenXmlFormats.Dml
             this.itemsValueField.Add(null);
             return obj;
         }
+
+        public void AddNewLum(int dpIndex)
+        {
+            var accentsLoopIndex = dpIndex / 6;
+            //modValue and offValue allows to set custom tint on accent color
+            //in such a way we can get unique colors for each pie sector.
+            if (accentsLoopIndex != 0)
+            {
+                var modValue = 10000 * new Random().Next(2, 9);
+                var offValue = 10000 * new Random().Next(1, 5);
+                itemsElementNameField.Add(EG_ColorTransform.lumMod);
+                itemsValueField.Add(modValue.ToString());
+                itemsElementNameField.Add(EG_ColorTransform.lumOff);
+                itemsValueField.Add(offValue.ToString());
+            }
+        }
+
         public static CT_SchemeColor Parse(XmlNode node, XmlNamespaceManager namespaceManager)
         {
             if (node == null)
@@ -3094,7 +3111,7 @@ namespace NPOI.OpenXmlFormats.Dml
             if (node == null)
                 return null;
             CT_Hyperlink ctObj = new CT_Hyperlink();
-            ctObj.id = XmlHelper.ReadString(node.Attributes["id"]);
+            ctObj.id = XmlHelper.ReadString(node.Attributes["r:id"]);
             ctObj.invalidUrl = XmlHelper.ReadString(node.Attributes["invalidUrl"]);
             ctObj.action = XmlHelper.ReadString(node.Attributes["action"]);
             ctObj.tgtFrame = XmlHelper.ReadString(node.Attributes["tgtFrame"]);
@@ -3116,15 +3133,15 @@ namespace NPOI.OpenXmlFormats.Dml
 
         internal void Write(StreamWriter sw, string nodeName)
         {
-            sw.Write(string.Format("<a:{0}", nodeName));
-            XmlHelper.WriteAttribute(sw, "id", this.id);
+            sw.Write(string.Format("<a:{0} xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\"", nodeName));
+            XmlHelper.WriteAttribute(sw, "r:id", this.id);
             XmlHelper.WriteAttribute(sw, "invalidUrl", this.invalidUrl);
             XmlHelper.WriteAttribute(sw, "action", this.action);
             XmlHelper.WriteAttribute(sw, "tgtFrame", this.tgtFrame);
             XmlHelper.WriteAttribute(sw, "tooltip", this.tooltip);
-            XmlHelper.WriteAttribute(sw, "history", this.history);
-            XmlHelper.WriteAttribute(sw, "highlightClick", this.highlightClick);
-            XmlHelper.WriteAttribute(sw, "endSnd", this.endSnd);
+            XmlHelper.WriteAttribute(sw, "history", this.history, false, true);
+            XmlHelper.WriteAttribute(sw, "highlightClick", this.highlightClick, false, false);
+            XmlHelper.WriteAttribute(sw, "endSnd", this.endSnd, false, false);
             sw.Write(">");
             if (this.snd != null)
                 this.snd.Write(sw, "snd");
@@ -3134,8 +3151,6 @@ namespace NPOI.OpenXmlFormats.Dml
         }
         public CT_Hyperlink()
         {
-            //this.extLstField = new CT_OfficeArtExtensionList();
-            //this.sndField = new CT_EmbeddedWAVAudioFile();
             this.invalidUrlField = "";
             this.actionField = "";
             this.tgtFrameField = "";

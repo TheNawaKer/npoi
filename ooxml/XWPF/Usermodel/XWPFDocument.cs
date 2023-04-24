@@ -40,7 +40,7 @@ namespace NPOI.XWPF.UserModel
      *  http://www.ecma-international.org/publications/standards/Ecma-376.htm
      *  at some point in your use.</p>
      */
-    public class XWPFDocument : POIXMLDocument, Document, IBody
+    public class XWPFDocument : POIXMLDocument, Document, IBody, IDisposable
     {
 
         private CT_Document ctDocument;
@@ -51,7 +51,6 @@ namespace NPOI.XWPF.UserModel
         private IdentifierManager drawingIdManager = new IdentifierManager(0L, 4294967295L);
         protected List<XWPFFooter> footers = new List<XWPFFooter>();
         protected List<XWPFHeader> headers = new List<XWPFHeader>();
-        protected List<XWPFComment> comments = new List<XWPFComment>();
         protected List<XWPFHyperlink> hyperlinks = new List<XWPFHyperlink>();
         protected List<XWPFParagraph> paragraphs = new List<XWPFParagraph>();
         protected List<XWPFTable> tables = new List<XWPFTable>();
@@ -63,6 +62,7 @@ namespace NPOI.XWPF.UserModel
         protected XWPFNumbering numbering;
         protected XWPFStyles styles;
         protected XWPFFootnotes footnotes;
+        private XWPFComments comments;
 
         /** Handles the joy of different headers/footers for different pages */
         private XWPFHeaderFooterPolicy headerFooterPolicy;
@@ -153,12 +153,8 @@ namespace NPOI.XWPF.UserModel
                     }
                     else if (relation.Equals(XWPFRelation.COMMENT.Relation))
                     {
-                        XmlDocument xml = ConvertStreamToXml(p.GetPackagePart().GetInputStream());
-                        CommentsDocument cmntdoc = CommentsDocument.Parse(xml ,NamespaceManager);
-                        foreach (CT_Comment ctcomment in cmntdoc.Comments.comment)
-                        {
-                            comments.Add(new XWPFComment(ctcomment, this));
-                        }
+                        this.comments = (XWPFComments)p;
+                        this.comments.OnDocumentRead();
                     }
                     else if (relation.Equals(XWPFRelation.SETTINGS.Relation))
                     {
@@ -214,7 +210,7 @@ namespace NPOI.XWPF.UserModel
                 while (relIter.MoveNext())
                 {
                     PackageRelationship rel = relIter.Current;
-                    hyperlinks.Add(new XWPFHyperlink(rel.Id, rel.TargetUri.ToString()));
+                    hyperlinks.Add(new XWPFHyperlink(rel.Id, rel.TargetUri.OriginalString));
                 }
             }
             catch (InvalidDataException e)
@@ -238,7 +234,7 @@ namespace NPOI.XWPF.UserModel
                    EndnotesDocument endnotesDocument = EndnotesDocument.Parse(xmldoc, NamespaceManager);
                    foreach (CT_FtnEdn ctFtnEdn in endnotesDocument.Endnotes.endnote)
                    {
-                       endnotes.Add(Int32.Parse(ctFtnEdn.id), new XWPFFootnote(this, ctFtnEdn));
+                       endnotes.Add(ctFtnEdn.id, new XWPFFootnote(this, ctFtnEdn));
                    }
                }
             }
@@ -487,22 +483,32 @@ namespace NPOI.XWPF.UserModel
             return hyperlinks.ToArray();
         }
 
+        /**
+         * Get Comments
+         *
+         * @return comments
+         */
+        public XWPFComments GetDocComments()
+        {
+            return comments;
+        }
+
         public XWPFComment GetCommentByID(String id)
         {
-            IEnumerator<XWPFComment> iter = comments.GetEnumerator();
-            while (iter.MoveNext())
+            if (null == comments)
             {
-                XWPFComment comment = iter.Current;
-                if (comment.Id.Equals(id))
-                    return comment;
+                return null;
             }
-
-            return null;
+            return comments.GetCommentByID(id);
         }
 
         public XWPFComment[] GetComments()
         {
-            return comments.ToArray();
+            if (null == comments)
+            {
+                return null;
+            }
+            return comments.GetComments().ToArray();
         }
 
         /**
@@ -897,6 +903,28 @@ namespace NPOI.XWPF.UserModel
         }
 
         /**
+         * Creates an empty comments for the document if one does not already exist
+         *
+         * @return comments
+         */
+        public XWPFComments CreateComments()
+        {
+            if (comments == null)
+            {
+                CommentsDocument commentsDoc = new CommentsDocument();
+
+                XWPFRelation relation = XWPFRelation.COMMENT;
+                int i = GetRelationIndex(relation);
+
+                XWPFComments wrapper = (XWPFComments)CreateRelationship(relation, XWPFFactory.GetInstance(), i);
+                wrapper.SetCtComments(commentsDoc.AddNewComments());
+                wrapper.SetXWPFDocument(GetXWPFDocument());
+                comments = wrapper;
+            }
+            return comments;
+        }
+
+        /**
          * Creates an empty numbering if one does not already exist and Sets the numbering member
          * @return numbering
          */
@@ -966,8 +994,41 @@ namespace NPOI.XWPF.UserModel
         public XWPFFootnote AddEndnote(CT_FtnEdn note)
         {
             XWPFFootnote endnote = new XWPFFootnote(this, note);
-            endnotes.Add(int.Parse(note.id), endnote);
+            endnotes.Add(note.id, endnote);
             return endnote;
+        }
+
+        /// <summary>
+        /// Create a new footnote and add it to the document.
+        /// </summary>
+        /// <remarks>
+        /// The new note will have one paragraph with the style "FootnoteText"
+        /// and one run containing the required footnote reference with the
+        /// style "FootnoteReference".
+        /// </remarks>
+        /// <returns>New XWPFFootnote.</returns>
+        public XWPFFootnote CreateFootnote()
+        {
+            XWPFFootnotes footnotes = this.CreateFootnotes();
+
+            XWPFFootnote footnote = footnotes.CreateFootnote();
+            return footnote;
+        }
+        /// <summary>
+        /// Remove the specified footnote if present.
+        /// </summary>
+        /// <param name="pos"></param>
+        /// <returns></returns>
+        public bool RemoveFootnote(int pos)
+        {
+            if (null != footnotes)
+            {
+                return footnotes.RemoveFootnote(pos);
+            }
+            else
+            {
+                return false;
+            }
         }
 
         /**
@@ -1646,5 +1707,9 @@ namespace NPOI.XWPF.UserModel
             return this;
         }
 
+        public void Dispose()
+        {
+            this.Close();
+        }
     } // end class
 }

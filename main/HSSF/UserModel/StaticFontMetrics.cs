@@ -20,7 +20,6 @@ namespace NPOI.HSSF.UserModel
     using System;
     using System.Collections;
     using System.IO;
-    using System.Drawing;
     using System.Configuration;
     using NPOI.Util.Collections;
 
@@ -35,7 +34,7 @@ namespace NPOI.HSSF.UserModel
      */
     class StaticFontMetrics
     {
-#if NETSTANDARD2_1 || NETSTANDARD2_0
+#if NETSTANDARD2_1 || NET6_0_OR_GREATER || NETSTANDARD2_0
         private const String FONT_METRICS_PROPERTIES_FILE_NAME = "NPOI.Resources.font_metrics.properties";
 #else
         private const String FONT_METRICS_PROPERTIES_FILE_NAME = "font_metrics.properties";
@@ -51,6 +50,7 @@ namespace NPOI.HSSF.UserModel
          * @param font  the font to lookup.
          * @return  the fake font.
          */
+        /* TODO - SixLabors.Fonts:
         public static FontDetails GetFontDetails(Font font)
         {
             // If we haven't alReady identified out font metrics file,
@@ -140,5 +140,6 @@ namespace NPOI.HSSF.UserModel
             }
 
         }
+        */
     }
 }

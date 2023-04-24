@@ -121,6 +121,37 @@ namespace TestCases.XWPF.UserModel
             xtab = new XWPFTable(new CT_Tbl(), doc);
             Assert.AreEqual(1, xtab.GetCTTbl().GetTrArray(0).SizeOfTcArray());
         }
+        [Test]
+        public void TestInsertRow()
+        {
+            XWPFDocument doc = new XWPFDocument();
+
+            CT_Tbl table = new CT_Tbl();
+            CT_Row r1 = table.AddNewTr();
+            r1.AddNewTc().AddNewP();
+            r1.AddNewTc().AddNewP();
+            CT_Row r2 = table.AddNewTr();
+            r2.AddNewTc().AddNewP();
+            r2.AddNewTc().AddNewP();
+            CT_Row r3 = table.AddNewTr();
+            r3.AddNewTc().AddNewP();
+            r3.AddNewTc().AddNewP();
+
+            XWPFTable xtab = new XWPFTable(table, doc);
+            Assert.AreEqual(3, xtab.NumberOfRows);
+            Assert.IsNotNull(xtab.GetRow(2));
+
+            //add a new row
+            xtab.CreateRow();
+            Assert.AreEqual(4, xtab.NumberOfRows);
+
+            xtab.InsertNewTableRow(0);
+            Assert.AreEqual(5, xtab.NumberOfRows);
+            xtab.InsertNewTableRow(xtab.NumberOfRows);
+            Assert.AreEqual(6, xtab.NumberOfRows);
+
+
+        }
 
         [Test]
         public void TestSetGetWidth()
@@ -173,6 +204,7 @@ namespace TestCases.XWPF.UserModel
             int r = table.CellMarginRight;
             Assert.AreEqual(450, r);
         }
+
         [Test]
         public void TestSetGetHBorders()
         {
@@ -265,6 +297,54 @@ namespace TestCases.XWPF.UserModel
                 }
             }
             doc.Package.Revert();
+        }
+
+        [Test]
+        public void TestSetTableCaption()
+        {
+            // create a table
+            XWPFDocument doc = new XWPFDocument();
+            CT_Tbl ctTable = new CT_Tbl();
+            XWPFTable table = new XWPFTable(ctTable, doc);
+
+            //Set Caption
+            table.TableCaption = "%TABLECAPTION%";
+
+            //Check
+            CT_String tblCaption = table.GetCTTbl().tblPr.tblCaption;
+            Assert.IsNotNull(tblCaption);
+            Assert.AreEqual("%TABLECAPTION%", tblCaption.val);
+        }
+
+        [Test]
+        public void TestSetTableDescription()
+        {
+            // create a table
+            XWPFDocument doc = new XWPFDocument();
+            CT_Tbl ctTable = new CT_Tbl();
+            XWPFTable table = new XWPFTable(ctTable, doc);
+
+            //Set Description
+            table.TableDescription = "%TABLEDESCRIPTION%";
+
+            //Check
+            CT_String tblDesc = table.GetCTTbl().tblPr.tblDescription;
+            Assert.IsNotNull(tblDesc);
+            Assert.AreEqual("%TABLEDESCRIPTION%", tblDesc.val);
+        }
+
+        [Test]
+        public void TestReadTableCaptionAndDescription()
+        {
+            // open an document with table containing Table caption and Table Description
+            XWPFDocument doc = XWPFTestDataSamples.OpenSampleDocument("table_properties.docx");
+
+            //Get Table
+            var table = doc.Tables[0];
+
+            //Assert Table Caption & Description
+            Assert.AreEqual("Table Title", table.TableCaption);
+            Assert.AreEqual("Table Description", table.TableDescription);
         }
     }
 }

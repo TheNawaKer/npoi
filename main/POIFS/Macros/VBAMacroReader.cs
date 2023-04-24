@@ -83,13 +83,13 @@ namespace NPOI.POIFS.Macros
                         this.fs = new NPOIFSFileSystem(zis);
                         return;
                     }
-                    catch (IOException e)
+                    catch (IOException)
                     {
                         // Tidy up
                         zis.Close();
 
                         // Pass on
-                        throw e;
+                        throw;
                     }
                 }
             }
@@ -142,7 +142,7 @@ namespace NPOI.POIFS.Macros
         {
             static ModuleMap()
             {
-#if NETSTANDARD2_1 || NETSTANDARD2_0
+#if NETSTANDARD2_1 || NET6_0_OR_GREATER || NETSTANDARD2_0
                 Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
 #endif
                 charset =Encoding.GetEncoding(1252);

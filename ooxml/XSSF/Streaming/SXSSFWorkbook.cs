@@ -446,6 +446,7 @@ namespace NPOI.XSSF.Streaming
                 ZipOutputStream zos = new ZipOutputStream(outStream);
                 try
                 {
+                    zos.UseZip64 = UseZip64.Off;
                     //ZipEntrySource zipEntrySource = new ZipFileZipEntrySource(zip);
                     //var en =  zipEntrySource.Entries;
                     var en = zip.GetEnumerator();
@@ -649,10 +650,11 @@ namespace NPOI.XSSF.Streaming
 			return CreateAndRegisterSXSSFSheet(XssfWorkbook.CreateSheet());
 		}
 
-		public ISheet CreateSheet(string sheetname)
-		{
-			return CreateAndRegisterSXSSFSheet(XssfWorkbook.CreateSheet(sheetname));
-		}
+        public ISheet CreateSheet(string sheetname)
+        {
+            SS.Util.WorkbookUtil.ValidateSheetName(sheetname);
+            return CreateAndRegisterSXSSFSheet(XssfWorkbook.CreateSheet(sheetname));
+        }
 
         public ISheet CloneSheet(int sheetNum)
         {
@@ -754,7 +756,10 @@ namespace NPOI.XSSF.Streaming
             //  it's a newly created one
             XssfWorkbook.Close();
         }
-
+        public void Write(Stream stream, bool leaveOpen = false)
+        {
+            this.Write(stream);
+        }
         public void Write(Stream stream)
         {
             FlushSheets();
@@ -970,6 +975,15 @@ namespace NPOI.XSSF.Streaming
         {
             return XssfWorkbook.IsDate1904();
         }
+
+        void IDisposable.Dispose()
+        {
+            this.Close();
+        }
+
+
+
+        //TODO: missing method isDate1904, isHidden, setHidden
 
         private class SheetEnumerator<T> : IEnumerator<T> where T : class, ISheet
         {
