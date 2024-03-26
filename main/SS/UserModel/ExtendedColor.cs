@@ -83,7 +83,7 @@ namespace NPOI.SS.UserModel
         /**
          * RGB or ARGB or null
          */
-        protected abstract byte[] StoredRBG { get; }
+        protected abstract byte[] StoredRGB { get; }
 
 
         protected byte[] GetRGBOrARGB()
@@ -108,7 +108,7 @@ namespace NPOI.SS.UserModel
             }
 
             // Grab the colour
-            return StoredRBG;
+            return StoredRGB;
         }
 
         /**
@@ -119,7 +119,7 @@ namespace NPOI.SS.UserModel
         {
             get
             {
-                byte[] rgb = StoredRBG;
+                byte[] rgb = StoredRGB;
                 if (rgb != null)
                 {
                     if (rgb.Length == 4)

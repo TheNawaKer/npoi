@@ -17,143 +17,148 @@
 
 namespace NPOI.SS.Util
 {
-	using System;
+    using System;
 
     using NPOI.SS.UserModel;
+    using System.Collections.Concurrent;
     using System.Collections.Generic;
     using SixLabors.Fonts;
     using System.Linq;
+    using System.Globalization;
 
-	/**
-	 * Helper methods for when working with Usermodel sheets
-	 *
-	 * @author Yegor Kozlov
-	 */
-	public class SheetUtil
-	{
+    /**
+     * Helper methods for when working with Usermodel sheets
+     *
+     * @author Yegor Kozlov
+     */
+    public class SheetUtil
+    {
 
-		// /**
-		// * Excel measures columns in units of 1/256th of a character width
-		// * but the docs say nothing about what particular character is used.
-		// * '0' looks to be a good choice.
-		// */
-		private static char defaultChar = '0';
+        // /**
+        // * Excel measures columns in units of 1/256th of a character width
+        // * but the docs say nothing about what particular character is used.
+        // * '0' looks to be a good choice.
+        // */
+        private static char defaultChar = '0';
 
-		// /**
-		// * This is the multiple that the font height is scaled by when determining the
-		// * boundary of rotated text.
-		// */
-		//private static double fontHeightMultiple = 2.0;
+        // Default dpi
+        private static int dpi = 96;
 
-		/**
-		 *  Dummy formula Evaluator that does nothing.
-		 *  YK: The only reason of having this class is that
-		 *  {@link NPOI.SS.UserModel.DataFormatter#formatCellValue(NPOI.SS.UserModel.Cell)}
-		 *  returns formula string for formula cells. Dummy Evaluator Makes it to format the cached formula result.
-		 *
-		 *  See Bugzilla #50021 
-		 */
-		private static IFormulaEvaluator dummyEvaluator = new DummyEvaluator();
-		public class DummyEvaluator : IFormulaEvaluator
-		{
-			public void ClearAllCachedResultValues() { }
-			public void NotifySetFormula(ICell cell) { }
-			public void NotifyDeleteCell(ICell cell) { }
-			public void NotifyUpdateCell(ICell cell) { }
-			public CellValue Evaluate(ICell cell) { return null; }
-			public ICell EvaluateInCell(ICell cell) { return null; }
-			public bool IgnoreMissingWorkbooks { get; set; }
-			public void SetupReferencedWorkbooks(Dictionary<String, IFormulaEvaluator> workbooks) { }
-			public void EvaluateAll() { }
+        // /**
+        // * This is the multiple that the font height is scaled by when determining the
+        // * boundary of rotated text.
+        // */
+        //private static double fontHeightMultiple = 2.0;
 
-			public CellType EvaluateFormulaCell(ICell cell)
-			{
-				return cell.CachedFormulaResultType;
-			}
+        /**
+         *  Dummy formula Evaluator that does nothing.
+         *  YK: The only reason of having this class is that
+         *  {@link NPOI.SS.UserModel.DataFormatter#formatCellValue(NPOI.SS.UserModel.Cell)}
+         *  returns formula string for formula cells. Dummy Evaluator Makes it to format the cached formula result.
+         *
+         *  See Bugzilla #50021 
+         */
+        private static IFormulaEvaluator dummyEvaluator = new DummyEvaluator();
+        public class DummyEvaluator : IFormulaEvaluator
+        {
+            public void ClearAllCachedResultValues() { }
+            public void NotifySetFormula(ICell cell) { }
+            public void NotifyDeleteCell(ICell cell) { }
+            public void NotifyUpdateCell(ICell cell) { }
+            public CellValue Evaluate(ICell cell) { return null; }
+            public ICell EvaluateInCell(ICell cell) { return null; }
+            public bool IgnoreMissingWorkbooks { get; set; }
+            public void SetupReferencedWorkbooks(Dictionary<String, IFormulaEvaluator> workbooks) { }
+            public void EvaluateAll() { }
 
-			public bool DebugEvaluationOutputForNextEval
-			{
-				get
-				{
-					throw new NotImplementedException();
-				}
-				set
-				{
-					throw new NotImplementedException();
-				}
-			}
-		}
-		public static IRow CopyRow(ISheet sourceSheet, int sourceRowIndex, ISheet targetSheet, int targetRowIndex)
-		{
-			// Get the source / new row
-			IRow newRow = targetSheet.GetRow(targetRowIndex);
-			IRow sourceRow = sourceSheet.GetRow(sourceRowIndex);
+            public CellType EvaluateFormulaCell(ICell cell)
+            {
+                return cell.CachedFormulaResultType;
+            }
 
-			// If the row exist in destination, push down all rows by 1 else create a new row
-			if (newRow != null)
-			{
-				targetSheet.RemoveRow(newRow);
-			}
-			newRow = targetSheet.CreateRow(targetRowIndex);
-			if (sourceRow == null)
-				throw new ArgumentNullException("source row doesn't exist");
-			// Loop through source columns to add to new row
-			for (int i = sourceRow.FirstCellNum; i < sourceRow.LastCellNum; i++)
-			{
-				// Grab a copy of the old/new cell
-				ICell oldCell = sourceRow.GetCell(i);
+            public bool DebugEvaluationOutputForNextEval
+            {
+                get
+                {
+                    throw new NotImplementedException();
+                }
+                set
+                {
+                    throw new NotImplementedException();
+                }
+            }
+        }
+        public static IRow CopyRow(ISheet sourceSheet, int sourceRowIndex, ISheet targetSheet, int targetRowIndex)
+        {
+            // Get the source / new row
+            IRow newRow = targetSheet.GetRow(targetRowIndex);
+            IRow sourceRow = sourceSheet.GetRow(sourceRowIndex);
 
-				// If the old cell is null jump to next cell
-				if (oldCell == null)
-				{
-					continue;
-				}
-				ICell newCell = newRow.CreateCell(i);
+            // If the row exist in destination, push down all rows by 1 else create a new row
+            if (newRow != null)
+            {
+                targetSheet.RemoveRow(newRow);
+            }
+            newRow = targetSheet.CreateRow(targetRowIndex);
+            if (sourceRow == null)
+                throw new ArgumentNullException("source row doesn't exist");
+            // Loop through source columns to add to new row
+            for (int i = sourceRow.FirstCellNum; i < sourceRow.LastCellNum; i++)
+            {
+                // Grab a copy of the old/new cell
+                ICell oldCell = sourceRow.GetCell(i);
 
-				if (oldCell.CellStyle != null)
-				{
-					// apply style from old cell to new cell 
-					newCell.CellStyle = oldCell.CellStyle;
-				}
+                // If the old cell is null jump to next cell
+                if (oldCell == null)
+                {
+                    continue;
+                }
+                ICell newCell = newRow.CreateCell(i);
 
-				// If there is a cell comment, copy
-				if (oldCell.CellComment != null)
-				{
-					newCell.CellComment = oldCell.CellComment;
-				}
+                if (oldCell.CellStyle != null)
+                {
+                    // apply style from old cell to new cell 
+                    newCell.CellStyle = oldCell.CellStyle;
+                }
 
-				// If there is a cell hyperlink, copy
-				if (oldCell.Hyperlink != null)
-				{
-					newCell.Hyperlink = oldCell.Hyperlink;
-				}
+                // If there is a cell comment, copy
+                if (oldCell.CellComment != null)
+                {
+                    sourceSheet.CopyComment(oldCell, newCell);
+                }
 
-				// Set the cell data type
-				newCell.SetCellType(oldCell.CellType);
+                // If there is a cell hyperlink, copy
+                if (oldCell.Hyperlink != null)
+                {
+                    newCell.Hyperlink = oldCell.Hyperlink;
+                }
 
-				// Set the cell data value
-				switch (oldCell.CellType)
-				{
-					case CellType.Blank:
-						newCell.SetCellValue(oldCell.StringCellValue);
-						break;
-					case CellType.Boolean:
-						newCell.SetCellValue(oldCell.BooleanCellValue);
-						break;
-					case CellType.Error:
-						newCell.SetCellErrorValue(oldCell.ErrorCellValue);
-						break;
-					case CellType.Formula:
-						newCell.SetCellFormula(oldCell.CellFormula);
-						break;
-					case CellType.Numeric:
-						newCell.SetCellValue(oldCell.NumericCellValue);
-						break;
-					case CellType.String:
-						newCell.SetCellValue(oldCell.RichStringCellValue);
-						break;
-				}
-			}
+                // Set the cell data type
+                newCell.SetCellType(oldCell.CellType);
+
+                // Set the cell data value
+                switch (oldCell.CellType)
+                {
+                    case CellType.Blank:
+                        newCell.SetCellValue(oldCell.StringCellValue);
+                        break;
+                    case CellType.Boolean:
+                        newCell.SetCellValue(oldCell.BooleanCellValue);
+                        break;
+                    case CellType.Error:
+                        newCell.SetCellErrorValue(oldCell.ErrorCellValue);
+                        break;
+                    case CellType.Formula:
+                        newCell.SetCellFormula(oldCell.CellFormula);
+                        break;
+                    case CellType.Numeric:
+                        newCell.SetCellValue(oldCell.NumericCellValue);
+                        break;
+                    case CellType.String:
+                        newCell.SetCellValue(oldCell.RichStringCellValue);
+                        break;
+                }
+            }
 
             // If there are are any merged regions in the source row, copy to new row
             for (int i = 0; i < sourceSheet.NumMergedRegions; i++)
@@ -173,6 +178,7 @@ namespace NPOI.SS.Util
             }
             return newRow;
         }
+
         public static IRow CopyRow(ISheet sheet, int sourceRowIndex, int targetRowIndex)
         {
             if (sourceRowIndex == targetRowIndex)
@@ -186,100 +192,105 @@ namespace NPOI.SS.Util
             {
                 sheet.ShiftRows(targetRowIndex, sheet.LastRowNum, 1);
             }
-            newRow = sheet.CreateRow(targetRowIndex);
-            newRow.Height = sourceRow.Height;   //copy row height
 
-			// Loop through source columns to add to new row
-			for (int i = sourceRow.FirstCellNum; i < sourceRow.LastCellNum; i++)
-			{
-				// Grab a copy of the old/new cell
-				ICell oldCell = sourceRow.GetCell(i);
-
-				// If the old cell is null jump to next cell
-				if (oldCell == null)
-				{
-					continue;
-				}
-				ICell newCell = newRow.CreateCell(i);
-
-				if (oldCell.CellStyle != null)
-				{
-					// apply style from old cell to new cell 
-					newCell.CellStyle = oldCell.CellStyle;
-				}
-
-				// If there is a cell comment, copy
-				if (oldCell.CellComment != null)
-				{
-					newCell.CellComment = oldCell.CellComment;
-				}
-
-				// If there is a cell hyperlink, copy
-				if (oldCell.Hyperlink != null)
-				{
-					newCell.Hyperlink = oldCell.Hyperlink;
-				}
-
-				// Set the cell data type
-				newCell.SetCellType(oldCell.CellType);
-
-				// Set the cell data value
-				switch (oldCell.CellType)
-				{
-					case CellType.Blank:
-						newCell.SetCellValue(oldCell.StringCellValue);
-						break;
-					case CellType.Boolean:
-						newCell.SetCellValue(oldCell.BooleanCellValue);
-						break;
-					case CellType.Error:
-						newCell.SetCellErrorValue(oldCell.ErrorCellValue);
-						break;
-					case CellType.Formula:
-						newCell.SetCellFormula(oldCell.CellFormula);
-						break;
-					case CellType.Numeric:
-						newCell.SetCellValue(oldCell.NumericCellValue);
-						break;
-					case CellType.String:
-						newCell.SetCellValue(oldCell.RichStringCellValue);
-						break;
-				}
-			}
-
-            // If there are are any merged regions in the source row, copy to new row
-            for (int i = 0; i < sheet.NumMergedRegions; i++)
+            if (sourceRow != null)
             {
-                CellRangeAddress cellRangeAddress = sheet.GetMergedRegion(i);
-                if (cellRangeAddress != null && cellRangeAddress.FirstRow == sourceRow.RowNum)
+                newRow = sheet.CreateRow(targetRowIndex);
+                newRow.Height = sourceRow.Height;   //copy row height
+
+                // Loop through source columns to add to new row
+                for (int i = sourceRow.FirstCellNum; i < sourceRow.LastCellNum; i++)
                 {
-                    CellRangeAddress newCellRangeAddress = new CellRangeAddress(newRow.RowNum,
-                            (newRow.RowNum +
-                                    (cellRangeAddress.LastRow - cellRangeAddress.FirstRow
-                                            )),
-                            cellRangeAddress.FirstColumn,
-                            cellRangeAddress.LastColumn);
-                    sheet.AddMergedRegion(newCellRangeAddress);
+                    // Grab a copy of the old/new cell
+                    ICell oldCell = sourceRow.GetCell(i);
+
+                    // If the old cell is null jump to next cell
+                    if (oldCell == null)
+                    {
+                        continue;
+                    }
+                    ICell newCell = newRow.CreateCell(i);
+
+                    if (oldCell.CellStyle != null)
+                    {
+                        // apply style from old cell to new cell 
+                        newCell.CellStyle = oldCell.CellStyle;
+                    }
+
+                    // If there is a cell comment, copy
+                    if (oldCell.CellComment != null)
+                    {
+                        sheet.CopyComment(oldCell, newCell);
+                    }
+
+                    // If there is a cell hyperlink, copy
+                    if (oldCell.Hyperlink != null)
+                    {
+                        newCell.Hyperlink = oldCell.Hyperlink;
+                    }
+
+                    // Set the cell data type
+                    newCell.SetCellType(oldCell.CellType);
+
+                    // Set the cell data value
+                    switch (oldCell.CellType)
+                    {
+                        case CellType.Blank:
+                            newCell.SetCellValue(oldCell.StringCellValue);
+                            break;
+                        case CellType.Boolean:
+                            newCell.SetCellValue(oldCell.BooleanCellValue);
+                            break;
+                        case CellType.Error:
+                            newCell.SetCellErrorValue(oldCell.ErrorCellValue);
+                            break;
+                        case CellType.Formula:
+                            newCell.SetCellFormula(oldCell.CellFormula);
+                            break;
+                        case CellType.Numeric:
+                            newCell.SetCellValue(oldCell.NumericCellValue);
+                            break;
+                        case CellType.String:
+                            newCell.SetCellValue(oldCell.RichStringCellValue);
+                            break;
+                    }
+                }
+
+                // If there are are any merged regions in the source row, copy to new row
+                for (int i = 0; i < sheet.NumMergedRegions; i++)
+                {
+                    CellRangeAddress cellRangeAddress = sheet.GetMergedRegion(i);
+                    if (cellRangeAddress != null && cellRangeAddress.FirstRow == sourceRow.RowNum)
+                    {
+                        CellRangeAddress newCellRangeAddress = new CellRangeAddress(newRow.RowNum,
+                                (newRow.RowNum +
+                                        (cellRangeAddress.LastRow - cellRangeAddress.FirstRow
+                                                )),
+                                cellRangeAddress.FirstColumn,
+                                cellRangeAddress.LastColumn);
+                        sheet.AddMergedRegion(newCellRangeAddress);
+                    }
                 }
             }
+
             return newRow;
         }
 
         public static double GetRowHeight(IRow row, bool useMergedCells, int firstColumnIdx, int lastColumnIdx)
         {
-            double width = -1;
+            double height = -1;
 
             for (int cellIdx = firstColumnIdx; cellIdx <= lastColumnIdx; ++cellIdx)
             {
                 ICell cell = row.GetCell(cellIdx);
                 if (row != null && cell != null)
                 {
-                    double cellWidth = GetCellHeight(cell, useMergedCells);
-                    width = Math.Max(width, cellWidth);
+                    double cellHeight = GetCellHeight(cell, useMergedCells);
+                    height = Math.Max(height, cellHeight);
                 }
             }
 
-            return width;
+            return height;
         }
 
         public static double GetRowHeight(ISheet sheet, int rowIdx, bool useMergedCells, int firstColumnIdx, int lastColumnIdx)
@@ -364,8 +375,7 @@ namespace NPOI.SS.Util
 
         private static double GetCellConetntHeight(double actualHeight, int numberOfRowsInMergedRegion)
         {
-            var correction = 1.1;
-            return Math.Max(-1, actualHeight / numberOfRowsInMergedRegion * correction);
+            return Math.Max(-1, actualHeight / numberOfRowsInMergedRegion);
         }
 
         private static string GetCellStringValue(ICell cell)
@@ -414,7 +424,7 @@ namespace NPOI.SS.Util
         private static double GetRotatedContentHeight(ICell cell, string stringValue, Font windowsFont)
         {
             var angle = cell.CellStyle.Rotation * 2.0 * Math.PI / 360.0;
-            var measureResult = TextMeasurer.Measure(stringValue, new TextOptions(windowsFont));
+            var measureResult = TextMeasurer.MeasureAdvance(stringValue, new TextOptions(windowsFont) { Dpi = dpi });
 
             var x1 = Math.Abs(measureResult.Height * Math.Cos(angle));
             var x2 = Math.Abs(measureResult.Width * Math.Sin(angle));
@@ -424,8 +434,8 @@ namespace NPOI.SS.Util
 
         private static double GetContentHeight(string stringValue, Font windowsFont)
         {
-            var measureResult = TextMeasurer.Measure(stringValue, new TextOptions(windowsFont));
-            
+            var measureResult = TextMeasurer.MeasureAdvance(stringValue, new TextOptions(windowsFont) { Dpi = dpi });
+
             return Math.Round(measureResult.Height, 0, MidpointRounding.ToEven);
         }
 
@@ -445,81 +455,80 @@ namespace NPOI.SS.Util
             IRow row = cell.Row;
             int column = cell.ColumnIndex;
 
-			int colspan = 1;
-			for (int i = 0; i < sheet.NumMergedRegions; i++)
-			{
-				CellRangeAddress region = sheet.GetMergedRegion(i);
-				if (ContainsCell(region, row.RowNum, column))
-				{
-					if (!useMergedCells)
-					{
-						// If we're not using merged cells, skip this one and move on to the next.
-						return -1;
-					}
-					cell = row.GetCell(region.FirstColumn);
-					colspan = 1 + region.LastColumn - region.FirstColumn;
-				}
-			}
-
-			ICellStyle style = cell.CellStyle;
-			CellType cellType = cell.CellType;
-			IFont defaultFont = wb.GetFontAt((short)0);
-			Font windowsFont = IFont2Font(defaultFont);
-			// for formula cells we compute the cell width for the cached formula result
-			if (cellType == CellType.Formula) cellType = cell.CachedFormulaResultType;
-
-			IFont font = wb.GetFontAt(style.FontIndex);
-
-            double width = -1;
+            int colspan = 1;
+            for (int i = 0; i < sheet.NumMergedRegions; i++)
             {
-                if (cellType == CellType.String)
+                CellRangeAddress region = sheet.GetMergedRegion(i);
+                if (ContainsCell(region, row.RowNum, column))
                 {
-                    IRichTextString rt = cell.RichStringCellValue;
-                    String[] lines = rt.String.Split("\n".ToCharArray());
-                    for (int i = 0; i < lines.Length; i++)
+                    if (!useMergedCells)
                     {
-                        String txt = lines[i] + defaultChar;
-
-                        //AttributedString str = new AttributedString(txt);
-                        //copyAttributes(font, str, 0, txt.length());
-                        windowsFont = IFont2Font(font);
-                        if (rt.NumFormattingRuns > 0)
-                        {
-                            // TODO: support rich text fragments
-                        }
-
-                        width = GetCellWidth(defaultCharWidth, colspan, style, width, txt, windowsFont, cell);
+                        // If we're not using merged cells, skip this one and move on to the next.
+                        return -1;
                     }
-                }
-                else
-                {
-                    String sval = null;
-                    if (cellType == CellType.Numeric)
-                    {
-                        // Try to get it formatted to look the same as excel
-                        try
-                        {
-                            sval = formatter.FormatCellValue(cell, dummyEvaluator);
-                        }
-                        catch
-                        {
-                            sval = cell.NumericCellValue.ToString();
-                        }
-                    }
-                    else if (cellType == CellType.Boolean)
-                    {
-                        sval = cell.BooleanCellValue.ToString().ToUpper();
-                    }
-                    if (sval != null)
-                    {
-                        String txt = sval + defaultChar;
-                        //str = new AttributedString(txt);
-                        //copyAttributes(font, str, 0, txt.length());
-                        windowsFont = IFont2Font(font);
-                        width = GetCellWidth(defaultCharWidth, colspan, style, width, txt, windowsFont, cell);
-                    }
+                    cell = row.GetCell(region.FirstColumn);
+                    colspan = 1 + region.LastColumn - region.FirstColumn;
                 }
             }
+
+            ICellStyle style = cell.CellStyle;
+            CellType cellType = cell.CellType;
+
+            // for formula cells we compute the cell width for the cached formula result
+            if (cellType == CellType.Formula)
+                cellType = cell.CachedFormulaResultType;
+
+            IFont font = wb.GetFontAt(style.FontIndex);
+            Font windowsFont = IFont2Font(font);
+
+            double width = -1;
+
+            if (cellType == CellType.String)
+            {
+                IRichTextString rt = cell.RichStringCellValue;
+                String[] lines = rt.String.Split("\n".ToCharArray());
+                for (int i = 0; i < lines.Length; i++)
+                {
+                    String txt = lines[i];
+
+                    //AttributedString str = new AttributedString(txt);
+                    //copyAttributes(font, str, 0, txt.length());
+                    if (rt.NumFormattingRuns > 0)
+                    {
+                        // TODO: support rich text fragments
+                    }
+
+                    width = GetCellWidth(defaultCharWidth, colspan, style, width, txt, windowsFont, cell);
+                }
+            }
+            else
+            {
+                String sval = null;
+                if (cellType == CellType.Numeric)
+                {
+                    // Try to get it formatted to look the same as excel
+                    try
+                    {
+                        sval = formatter.FormatCellValue(cell, dummyEvaluator);
+                    }
+                    catch
+                    {
+                        sval = cell.NumericCellValue.ToString();
+                    }
+                }
+                else if (cellType == CellType.Boolean)
+                {
+                    sval = cell.BooleanCellValue.ToString().ToUpper();
+                }
+                if (sval != null)
+                {
+                    String txt = sval;
+                    //str = new AttributedString(txt);
+                    //copyAttributes(font, str, 0, txt.length());
+                    width = GetCellWidth(defaultCharWidth, colspan, style, width, txt, windowsFont, cell);
+                }
+            }
+
             return width;
         }
 
@@ -528,25 +537,20 @@ namespace NPOI.SS.Util
         {
             //Rectangle bounds;
             double actualWidth;
-            FontRectangle sf = TextMeasurer.Measure(str, new TextOptions(windowsFont));
+            FontRectangle sf = TextMeasurer.MeasureSize(str, new TextOptions(windowsFont) { Dpi = dpi });
             if (style.Rotation != 0)
             {
                 double angle = style.Rotation * 2.0 * Math.PI / 360.0;
                 double x1 = Math.Abs(sf.Height * Math.Sin(angle));
                 double x2 = Math.Abs(sf.Width * Math.Cos(angle));
                 actualWidth = Math.Round(x1 + x2, 0, MidpointRounding.ToEven);
-                //bounds = layout.getOutline(trans).getBounds();
             }
             else
-            {
-                //bounds = layout.getBounds();
-                actualWidth = Math.Round(sf.Width, 0, MidpointRounding.ToEven);                
-            }
-            // entireWidth accounts for leading spaces which is excluded from bounds.getWidth()
-            //double frameWidth = bounds.getX() + bounds.getWidth();
-            //width = Math.max(width, ((frameWidth / colspan) / defaultCharWidth) + style.getIndention());
-            var correction = 1.1;
-            width = Math.Max(width, (actualWidth / colspan / defaultCharWidth * correction) + cell.CellStyle.Indention);
+                actualWidth = Math.Round(sf.Width, 0, MidpointRounding.ToEven);
+
+            int padding = 5;
+            double correction = 1.05;
+            width = Math.Max(width, ((actualWidth + padding) / colspan / defaultCharWidth * correction) + cell.CellStyle.Indention);
             return width;
         }
 
@@ -608,13 +612,9 @@ namespace NPOI.SS.Util
         public static int GetDefaultCharWidth(IWorkbook wb)
         {
             IFont defaultFont = wb.GetFontAt((short)0);
-
-            //AttributedString str = new AttributedString(String.valueOf(defaultChar));
-            //copyAttributes(defaultFont, str, 0, 1);
-            //TextLayout layout = new TextLayout(str.getIterator(), fontRenderContext);
-            //int defaultCharWidth = (int)layout.getAdvance();
             Font font = IFont2Font(defaultFont);
-            return (int)Math.Ceiling(TextMeasurer.Measure(new string(defaultChar, 1), new TextOptions(font)).Width);
+
+            return (int)Math.Ceiling(TextMeasurer.MeasureSize(new string(defaultChar, 1), new TextOptions(font) { Dpi = dpi }).Width);
         }
 
         /**
@@ -680,9 +680,47 @@ namespace NPOI.SS.Util
         //    str.AddAttribute(TextAttribute.SIZE, (float)font.FontHeightInPoints);
         //    if (font.Boldweight == (short)FontBoldWeight.BOLD) str.AddAttribute(TextAttribute.WEIGHT, TextAttribute.WEIGHT_BOLD, startIdx, endIdx);
         //    if (font.IsItalic) str.AddAttribute(TextAttribute.POSTURE, TextAttribute.POSTURE_OBLIQUE, startIdx, endIdx);
-        //    TODO-Fonts: not supported: if (font.Underline == (byte)FontUnderlineType.SINGLE) str.AddAttribute(TextAttribute.UNDERLINE, TextAttribute.UNDERLINE_ON, startIdx, endIdx);           
+        //    TODO-Fonts: not supported: if (font.Underline == (byte)FontUnderlineType.SINGLE) str.AddAttribute(TextAttribute.UNDERLINE, TextAttribute.UNDERLINE_ON, startIdx, endIdx);
         //}
-        
+
+        private readonly struct FontCacheKey : IEquatable<FontCacheKey>
+        {
+            public FontCacheKey(string fontName, float fontHeightInPoints, FontStyle style)
+            {
+                FontName = fontName;
+                FontHeightInPoints = fontHeightInPoints;
+                Style = style;
+            }
+
+            public readonly string FontName;
+            public readonly float FontHeightInPoints;
+            public readonly FontStyle Style;
+
+            public bool Equals(FontCacheKey other)
+            {
+                return FontName == other.FontName && FontHeightInPoints.Equals(other.FontHeightInPoints) && Style == other.Style;
+            }
+
+            public override bool Equals(object obj)
+            {
+                return obj is FontCacheKey other && Equals(other);
+            }
+
+            public override int GetHashCode()
+            {
+                unchecked
+                {
+                    var hashCode = FontName != null ? FontName.GetHashCode() : 0;
+                    hashCode = (hashCode * 397) ^ FontHeightInPoints.GetHashCode();
+                    hashCode = (hashCode * 397) ^ (int)Style;
+                    return hashCode;
+                }
+            }
+        }
+
+        private static readonly CultureInfo StartupCulture = CultureInfo.CurrentCulture;
+        private static readonly ConcurrentDictionary<FontCacheKey, Font> FontCache = new();
+
         /// <summary>
         /// Convert HSSFFont to Font.
         /// </summary>
@@ -690,13 +728,8 @@ namespace NPOI.SS.Util
         /// <returns></returns>
         /// <exception cref="FontException">Will throw this if no font are 
         /// found by SixLabors in the current environment.</exception>
-        internal static Font IFont2Font(IFont font1)
+        public static Font IFont2Font(IFont font1)
         {
-            if (SystemFonts.Families == null || SystemFonts.Families.Count() == 0)
-            {
-                throw new FontException("No fonts found installed on the machine.");
-            }
-
             FontStyle style = FontStyle.Regular;
             if (font1.IsBold)
             {
@@ -712,21 +745,39 @@ namespace NPOI.SS.Util
             }
             */
 
+            var key = new FontCacheKey(font1.FontName, (float)font1.FontHeightInPoints, style);
+
+            // only use cache if font size is an integer and culture is original to prevent cache size explosion
+            if (font1.FontHeightInPoints == (int)font1.FontHeightInPoints && CultureInfo.CurrentCulture.Equals(StartupCulture))
+            {
+                return FontCache.GetOrAdd(key, IFont2FontImpl);
+            }
+
+            // skip cache
+            return IFont2FontImpl(key);
+        }
+
+        private static Font IFont2FontImpl(FontCacheKey cacheKey)
+        {
             // Try to find font in system fonts. If we can not find out,
             // use "Arial". TODO-Fonts: More fallbacks.
-            SixLabors.Fonts.FontFamily fontFamily;
 
-            if (false == SystemFonts.TryGet(font1.FontName, out fontFamily))
+            if (!SystemFonts.TryGet(cacheKey.FontName, CultureInfo.CurrentCulture, out var fontFamily))
             {
-                if (false == SystemFonts.TryGet("Arial", out fontFamily))
+                if (!SystemFonts.TryGet("Arial", CultureInfo.CurrentCulture, out fontFamily))
                 {
+                    if (!SystemFonts.Families.Any())
+                    {
+                        throw new FontException("No fonts found installed on the machine.");
+                    }
+
                     fontFamily = SystemFonts.Families.First();
                 }
             }
-            
-            Font font = new Font(fontFamily, (float)font1.FontHeightInPoints, style);
-            return font;
+
+            return new Font(fontFamily, cacheKey.FontHeightInPoints, cacheKey.Style);
         }
+
         /// <summary>
         /// Check if the cell is in the specified cell range
         /// </summary>
@@ -740,100 +791,100 @@ namespace NPOI.SS.Util
             return cr.IsInRange(rowIx, colIx);
         }
 
-		/**
-		 * Generate a valid sheet name based on the existing one. Used when cloning sheets.
-		 *
-		 * @param srcName the original sheet name to
-		 * @return clone sheet name
-		 */
-		public static String GetUniqueSheetName(IWorkbook wb, String srcName)
-		{
-			if (wb.GetSheetIndex(srcName) == -1)
-			{
-				return srcName;
-			}
-			int uniqueIndex = 2;
-			String baseName = srcName;
-			int bracketPos = srcName.LastIndexOf('(');
-			if (bracketPos > 0 && srcName.EndsWith(")"))
-			{
-				String suffix = srcName.Substring(bracketPos + 1, srcName.Length - bracketPos - 2);
-				try
-				{
-					uniqueIndex = Int32.Parse(suffix.Trim());
-					uniqueIndex++;
-					baseName = srcName.Substring(0, bracketPos).Trim();
-				}
-				catch (FormatException)
-				{
-					// contents of brackets not numeric
-				}
-			}
-			while (true)
-			{
-				// Try and find the next sheet name that is unique
-				String index = (uniqueIndex++).ToString();
-				String name;
-				if (baseName.Length + index.Length + 2 < 31)
-				{
-					name = baseName + " (" + index + ")";
-				}
-				else
-				{
-					name = baseName.Substring(0, 31 - index.Length - 2) + "(" + index + ")";
-				}
+        /**
+         * Generate a valid sheet name based on the existing one. Used when cloning sheets.
+         *
+         * @param srcName the original sheet name to
+         * @return clone sheet name
+         */
+        public static String GetUniqueSheetName(IWorkbook wb, String srcName)
+        {
+            if (wb.GetSheetIndex(srcName) == -1)
+            {
+                return srcName;
+            }
+            int uniqueIndex = 2;
+            String baseName = srcName;
+            int bracketPos = srcName.LastIndexOf('(');
+            if (bracketPos > 0 && srcName.EndsWith(")"))
+            {
+                String suffix = srcName.Substring(bracketPos + 1, srcName.Length - bracketPos - 2);
+                try
+                {
+                    uniqueIndex = Int32.Parse(suffix.Trim());
+                    uniqueIndex++;
+                    baseName = srcName.Substring(0, bracketPos).Trim();
+                }
+                catch (FormatException)
+                {
+                    // contents of brackets not numeric
+                }
+            }
+            while (true)
+            {
+                // Try and find the next sheet name that is unique
+                String index = (uniqueIndex++).ToString();
+                String name;
+                if (baseName.Length + index.Length + 2 < 31)
+                {
+                    name = baseName + " (" + index + ")";
+                }
+                else
+                {
+                    name = baseName.Substring(0, 31 - index.Length - 2) + "(" + index + ")";
+                }
 
-				//If the sheet name is unique, then Set it otherwise Move on to the next number.
-				if (wb.GetSheetIndex(name) == -1)
-				{
-					return name;
-				}
-			}
-		}
+                //If the sheet name is unique, then Set it otherwise Move on to the next number.
+                if (wb.GetSheetIndex(name) == -1)
+                {
+                    return name;
+                }
+            }
+        }
 
-		/**
-		 * Return the cell, taking account of merged regions. Allows you to find the
-		 *  cell who's contents are Shown in a given position in the sheet.
-		 * 
-		 * <p>If the cell at the given co-ordinates is a merged cell, this will
-		 *  return the primary (top-left) most cell of the merged region.</p>
-		 * <p>If the cell at the given co-ordinates is not in a merged region,
-		 *  then will return the cell itself.</p>
-		 * <p>If there is no cell defined at the given co-ordinates, will return
-		 *  null.</p>
-		 */
-		public static ICell GetCellWithMerges(ISheet sheet, int rowIx, int colIx)
-		{
-			IRow r = sheet.GetRow(rowIx);
-			if (r != null)
-			{
-				ICell c = r.GetCell(colIx);
-				if (c != null)
-				{
-					// Normal, non-merged cell
-					return c;
-				}
-			}
+        /**
+         * Return the cell, taking account of merged regions. Allows you to find the
+         *  cell who's contents are Shown in a given position in the sheet.
+         * 
+         * <p>If the cell at the given co-ordinates is a merged cell, this will
+         *  return the primary (top-left) most cell of the merged region.</p>
+         * <p>If the cell at the given co-ordinates is not in a merged region,
+         *  then will return the cell itself.</p>
+         * <p>If there is no cell defined at the given co-ordinates, will return
+         *  null.</p>
+         */
+        public static ICell GetCellWithMerges(ISheet sheet, int rowIx, int colIx)
+        {
+            IRow r = sheet.GetRow(rowIx);
+            if (r != null)
+            {
+                ICell c = r.GetCell(colIx);
+                if (c != null)
+                {
+                    // Normal, non-merged cell
+                    return c;
+                }
+            }
 
-			for (int mr = 0; mr < sheet.NumMergedRegions; mr++)
-			{
-				CellRangeAddress mergedRegion = sheet.GetMergedRegion(mr);
-				if (mergedRegion.IsInRange(rowIx, colIx))
-				{
-					// The cell wanted is in this merged range
-					// Return the primary (top-left) cell for the range
-					r = sheet.GetRow(mergedRegion.FirstRow);
-					if (r != null)
-					{
-						return r.GetCell(mergedRegion.FirstColumn);
-					}
-				}
-			}
+            for (int mr = 0; mr < sheet.NumMergedRegions; mr++)
+            {
+                CellRangeAddress mergedRegion = sheet.GetMergedRegion(mr);
+                if (mergedRegion.IsInRange(rowIx, colIx))
+                {
+                    // The cell wanted is in this merged range
+                    // Return the primary (top-left) cell for the range
+                    r = sheet.GetRow(mergedRegion.FirstRow);
+                    if (r != null)
+                    {
+                        return r.GetCell(mergedRegion.FirstColumn);
+                    }
+                }
+            }
 
-			// If we Get here, then the cell isn't defined, and doesn't
-			//  live within any merged regions
-			return null;
-		}
+            // If we Get here, then the cell isn't defined, and doesn't
+            //  live within any merged regions
+            return null;
+        }
 
     }
 }

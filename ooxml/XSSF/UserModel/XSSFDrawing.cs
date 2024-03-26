@@ -73,6 +73,8 @@ namespace NPOI.XSSF.UserModel
             XmlDocument xmldoc = ConvertStreamToXml(part.GetInputStream());
             drawing = CT_Drawing.Parse(xmldoc, NamespaceManager);
         }
+
+        [Obsolete("deprecated in POI 3.14, scheduled for removal in POI 3.16")]
         public XSSFDrawing(PackagePart part, PackageRelationship rel)
             : this(part)
         {
@@ -127,6 +129,10 @@ namespace NPOI.XSSF.UserModel
             CT_Shape ctShape = ctAnchor.AddNewSp();
             ctShape.Set(XSSFSimpleShape.Prototype());
             ctShape.nvSpPr.cNvPr.id=(uint)shapeId;
+            ctShape.spPr.xfrm.off.x = ((XSSFClientAnchor)(anchor)).left;
+            ctShape.spPr.xfrm.off.y = ((XSSFClientAnchor)(anchor)).top;
+            ctShape.spPr.xfrm.ext.cx = ((XSSFClientAnchor)(anchor)).width;
+            ctShape.spPr.xfrm.ext.cy = ((XSSFClientAnchor)(anchor)).height;
             XSSFTextBox shape = new XSSFTextBox(this, ctShape);
             shape.anchor = (XSSFClientAnchor)anchor;
             return shape;
@@ -152,6 +158,10 @@ namespace NPOI.XSSF.UserModel
             ctShape.Set(XSSFPicture.Prototype());
 
             ctShape.nvPicPr.cNvPr.id = (uint)shapeId;
+            ctShape.spPr.xfrm.off.x = anchor.left;
+            ctShape.spPr.xfrm.off.y = anchor.top;
+            ctShape.spPr.xfrm.ext.cx = anchor.width;
+            ctShape.spPr.xfrm.ext.cy = anchor.height;
             ctShape.nvPicPr.cNvPr.name = "Picture " + shapeId;
 
             XSSFPicture shape = new XSSFPicture(this, ctShape);
@@ -267,8 +277,14 @@ namespace NPOI.XSSF.UserModel
             CT_Shape ctShape = ctAnchor.AddNewSp();
             ctShape.Set(XSSFSimpleShape.Prototype());
             ctShape.nvSpPr.cNvPr.id=(uint)(shapeId);
+            ctShape.spPr.xfrm.off.x = anchor.left;
+            ctShape.spPr.xfrm.off.y = anchor.top;
+            ctShape.spPr.xfrm.ext.cx = anchor.width;
+            ctShape.spPr.xfrm.ext.cy = anchor.height;
             XSSFSimpleShape shape = new XSSFSimpleShape(this, ctShape);
             shape.anchor = anchor;
+            shape.cellanchor = ctAnchor;
+
             return shape;
         }
 
@@ -282,13 +298,48 @@ namespace NPOI.XSSF.UserModel
          */
         public XSSFConnector CreateConnector(XSSFClientAnchor anchor)
         {
+            long shapeId = newShapeId();
             CT_TwoCellAnchor ctAnchor = CreateTwoCellAnchor(anchor);
             CT_Connector ctShape = ctAnchor.AddNewCxnSp();
             ctShape.Set(XSSFConnector.Prototype());
+            ctShape.nvCxnSpPr.cNvPr.id = (uint)(shapeId);
+            ctShape.spPr.xfrm.off.x = anchor.left;
+            ctShape.spPr.xfrm.off.y = anchor.top;
+            ctShape.spPr.xfrm.ext.cx = anchor.width;
+            ctShape.spPr.xfrm.ext.cy = anchor.height;
 
             XSSFConnector shape = new XSSFConnector(this, ctShape);
             shape.anchor = anchor;
+            shape.cellanchor = ctAnchor;
+
             return shape;
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="Sheet"></param>
+        /// <param name="anchor"></param>
+        /// <param name="coords"></param>
+        /// <returns></returns>
+        public XSSFFreeform CreateFreeform(
+              SS.UserModel.ISheet Sheet
+            , BuildFreeForm BFF
+        ) {
+            var anchor = new XSSFClientAnchor(Sheet, (int)BFF.Min.x, (int)BFF.Min.y
+                                                   , (int)BFF.Max.x, (int)BFF.Max.y);
+            long shapeId = newShapeId();
+            CT_TwoCellAnchor ctAnchor = CreateTwoCellAnchor(anchor);
+            CT_Shape ctShape = ctAnchor.AddNewSp();
+            ctShape.Set(XSSFFreeform.Prototype());
+            ctShape.nvSpPr.cNvPr.id = (uint) (shapeId);
+            var freeform = new XSSFFreeform(this, ctShape);
+            freeform.anchor = anchor;
+            freeform.cellanchor = ctAnchor;
+                
+            freeform.Build(BFF);
+
+            return freeform;
         }
 
         /**
@@ -301,12 +352,24 @@ namespace NPOI.XSSF.UserModel
          */
         public XSSFShapeGroup CreateGroup(XSSFClientAnchor anchor)
         {
+            long shapeId = newShapeId();
             CT_TwoCellAnchor ctAnchor = CreateTwoCellAnchor(anchor);
             CT_GroupShape ctGroup = ctAnchor.AddNewGrpSp();
             ctGroup.Set(XSSFShapeGroup.Prototype());
+            ctGroup.nvGrpSpPr.cNvPr.id = (uint)(shapeId);
+            ctGroup.grpSpPr.xfrm.off.x = anchor.left;
+            ctGroup.grpSpPr.xfrm.off.y = anchor.top;
+            ctGroup.grpSpPr.xfrm.ext.cx = anchor.width;
+            ctGroup.grpSpPr.xfrm.ext.cy = anchor.height;
+            ctGroup.grpSpPr.xfrm.chOff.x = ctGroup.grpSpPr.xfrm.off.x;
+            ctGroup.grpSpPr.xfrm.chOff.y = ctGroup.grpSpPr.xfrm.off.y;
+            ctGroup.grpSpPr.xfrm.chExt.cx =ctGroup.grpSpPr.xfrm.ext.cx;
+            ctGroup.grpSpPr.xfrm.chExt.cy =ctGroup.grpSpPr.xfrm.ext.cy;
 
             XSSFShapeGroup shape = new XSSFShapeGroup(this, ctGroup);
             shape.anchor = anchor;
+            shape.cellanchor = ctAnchor;
+
             return shape;
         }
 
@@ -367,6 +430,8 @@ namespace NPOI.XSSF.UserModel
             graphicFrame.Anchor = anchor;
             graphicFrame.Id = frameId;
             graphicFrame.Name = "Diagramm" + frameId;
+            graphicFrame.cellanchor = ctAnchor;
+
             return graphicFrame;
         }
 
@@ -452,7 +517,39 @@ namespace NPOI.XSSF.UserModel
                 }
                 else if (anchor.groupShape != null)
                 {
-                    shape = new XSSFShapeGroup(this, anchor.groupShape);
+                    List<object> lstCtShapes = new List<object>();
+                    anchor.groupShape.GetShapes(lstCtShapes);
+
+                    foreach(var s in lstCtShapes)
+                    {
+                        XSSFShape gShape = null;
+                        if(s is CT_Connector)
+                        {
+                            gShape = new XSSFConnector(this, (CT_Connector)s);
+                        }
+                        else if(s is CT_Picture)
+                        {
+                            gShape = new XSSFPicture(this, (CT_Picture)s);
+                        }
+                        else if(s is CT_Shape)
+                        {
+                            gShape = new XSSFSimpleShape(this, (CT_Shape)s);
+                        }
+                        else if(s is CT_GroupShape)
+                        {
+                            gShape = new XSSFShapeGroup(this, (CT_GroupShape)s);
+                        }
+                        else if(s is CT_GraphicalObjectFrame)
+                        {
+                            gShape = new XSSFGraphicFrame(this, (CT_GraphicalObjectFrame)s);
+                        }
+                        if(gShape != null)
+                        {
+                            gShape.anchor = GetAnchorFromIEGAnchor(anchor);
+                            gShape.cellanchor = anchor;
+                            lst.Add(gShape);
+                        }
+                    }
                 }
                 else if (anchor.graphicFrame != null)
                 {
@@ -465,6 +562,7 @@ namespace NPOI.XSSF.UserModel
                 if (shape != null)
                 {
                     shape.anchor = GetAnchorFromIEGAnchor(anchor);
+                    shape.cellanchor = anchor;
                     lst.Add(shape);
                 }
             }
@@ -493,6 +591,7 @@ namespace NPOI.XSSF.UserModel
             //}
             return lst;
         }
+ 
         private XSSFAnchor GetAnchorFromIEGAnchor(IEG_Anchor ctAnchor)
         {
             CT_Marker ctFrom=null, ctTo=null;

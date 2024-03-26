@@ -35,6 +35,7 @@ using System.Collections;
 using NPOI.OpenXml4Net.Exceptions;
 using NPOI.SS;
 using System.Globalization;
+using System.Linq;
 
 namespace NPOI.XSSF.UserModel
 {
@@ -261,7 +262,7 @@ namespace NPOI.XSSF.UserModel
         public XSSFWorkbook(FileInfo file)
             : this(OPCPackage.Open(file))
         {
-     
+
         }
 
         /**
@@ -602,7 +603,7 @@ namespace NPOI.XSSF.UserModel
             XSSFSheet clonedSheet = CreateSheet(newName) as XSSFSheet;
 
             // copy sheet's relations
-            List<RelationPart> rels = srcSheet.RelationParts;
+            IList<RelationPart> rels = srcSheet.RelationParts;
             // if the sheet being cloned has a drawing then rememebr it and re-create it too
             XSSFDrawing dg = null;
             foreach (RelationPart rp in rels)
@@ -660,6 +661,12 @@ namespace NPOI.XSSF.UserModel
                 ct.UnsetPageSetup();
             }
 
+            if (srcSheet.RepeatingRows != null)
+                clonedSheet.RepeatingRows = srcSheet.RepeatingRows;
+
+            if (srcSheet.RepeatingColumns != null)
+                clonedSheet.RepeatingColumns = srcSheet.RepeatingColumns;
+
             clonedSheet.IsSelected = (false);
 
             // clone the sheet drawing alongs with its relationships
@@ -678,7 +685,7 @@ namespace NPOI.XSSF.UserModel
                 clonedDg = clonedSheet.CreateDrawingPatriarch() as XSSFDrawing;
 
                 // Clone drawing relations
-                List<RelationPart> srcRels = (srcSheet.CreateDrawingPatriarch() as XSSFDrawing).RelationParts;
+                IList<RelationPart> srcRels = (srcSheet.CreateDrawingPatriarch() as XSSFDrawing).RelationParts;
                 foreach (RelationPart rp in srcRels)
                 {
                     AddRelation(rp, clonedDg);
@@ -928,7 +935,7 @@ namespace NPOI.XSSF.UserModel
         private void ValidateSheetName(String sheetName)
         {
             if (ContainsSheet(sheetName, sheets.Count))
-                throw new ArgumentException(string.Format("The workbook already contains a sheet named '{0}'",sheetName));
+                throw new ArgumentException(string.Format("The workbook already contains a sheet named '{0}'", sheetName));
         }
         protected XSSFDialogsheet CreateDialogsheet(String sheetname, CT_Dialogsheet dialogsheet)
         {
@@ -1271,7 +1278,7 @@ namespace NPOI.XSSF.UserModel
         public void RemoveName(String name)
         {
             List<XSSFName> names = namedRangesByName[name.ToLower()];
-            if (names.Count==0)
+            if (names.Count == 0)
             {
                 throw new ArgumentException("Named range was not found: " + name);
             }
@@ -1280,7 +1287,7 @@ namespace NPOI.XSSF.UserModel
 
         private bool RemoveMapping(string key, XSSFName item)
         {
-            if(namedRangesByName.ContainsKey(key))
+            if (namedRangesByName.ContainsKey(key))
             {
                 var values = namedRangesByName[key];
                 return values.Remove(item);
@@ -1571,7 +1578,7 @@ namespace NPOI.XSSF.UserModel
         {
             if (!namedRangesByName.ContainsKey(builtInCode.ToLower()))
                 return null;
-            
+
             foreach (XSSFName name in namedRangesByName[builtInCode.ToLower()])
             {
                 if (name.SheetIndex == sheetNumber)
@@ -1644,7 +1651,7 @@ namespace NPOI.XSSF.UserModel
 
             // Check it isn't already taken
             if (ContainsSheet(sheetname, sheetIndex))
-                throw new ArgumentException(string.Format("The workbook already contains a sheet named '{0}'",sheetname));
+                throw new ArgumentException(string.Format("The workbook already contains a sheet named '{0}'", sheetname));
 
             // Update references to the name
             XSSFFormulaUtils utils = new XSSFFormulaUtils(this);
@@ -1815,7 +1822,9 @@ namespace NPOI.XSSF.UserModel
         /// <summary>
         /// Write the document to the specified stream, and optionally leave the stream open without closing it.
         /// </summary>
-        public void Write(Stream stream, bool leaveOpen)
+        /// <param name="stream">the stream you wish to write the xlsx to</param>
+        /// <param name="leaveOpen">leave stream open or not</param>
+        public void Write(Stream stream, bool leaveOpen = false)
         {
             bool? originalValue = null;
             if (Package is ZipPackage)
@@ -1824,7 +1833,7 @@ namespace NPOI.XSSF.UserModel
                 originalValue = ((ZipPackage)Package).IsExternalStream;
                 ((ZipPackage)Package).IsExternalStream = leaveOpen;
             }
-            Write(stream);
+            base.Write(stream);
             if (originalValue.HasValue && Package is ZipPackage)
             {
                 ((ZipPackage)Package).IsExternalStream = originalValue.Value;
@@ -2217,7 +2226,7 @@ namespace NPOI.XSSF.UserModel
             foreach (var xssfPivotTable in pivotTables)
             {
                 var sheet = xssfPivotTable.GetParent();
-                if ( sheet is XSSFSheet )
+                if (sheet is XSSFSheet)
                 {
                     sheet.RemoveRelation(xssfPivotTable);
                 }
@@ -2227,7 +2236,7 @@ namespace NPOI.XSSF.UserModel
             {
                 if (poixmlDocumentPart is XSSFPivotCacheDefinition)
                 {
-                    var pivotCacheDefinition = (XSSFPivotCacheDefinition)poixmlDocumentPart; 
+                    var pivotCacheDefinition = (XSSFPivotCacheDefinition)poixmlDocumentPart;
                     RemoveRelation(pivotCacheDefinition);
                 }
             }
@@ -2412,7 +2421,33 @@ namespace NPOI.XSSF.UserModel
 
         public int AddPicture(byte[] pictureData, PictureType format)
         {
-            int imageNumber = GetAllPictures().Count + 1;
+            int imageNumber = 1;
+            List<XSSFPictureData> allPics = (List<XSSFPictureData>)GetAllPictures();
+
+            if (allPics.Any())
+            {
+                List<int> sortedIndexs = new List<int> { 0 };
+
+                sortedIndexs.AddRange
+                    (
+                        allPics
+                            .Select(pic => XSSFPictureData.RELATIONS[(int)pic.PictureType].GetFileNameIndex(pic))
+                            .OrderBy(i => i)
+                            .ToList()
+                    );
+
+                int previous = sortedIndexs[0];
+                for (int index = 1; index < sortedIndexs.Count; index++)
+                {
+                    if (sortedIndexs[index] > previous + 1)
+                        break;
+
+                    previous = sortedIndexs[index];
+                }
+
+                imageNumber = previous + 1;
+            }
+            
             XSSFPictureData img = (XSSFPictureData)CreateRelationship(XSSFPictureData.RELATIONS[(int)format], XSSFFactory.GetInstance(), imageNumber, true).DocumentPart;
             try
             {
@@ -2425,8 +2460,9 @@ namespace NPOI.XSSF.UserModel
                 throw new POIXMLException(e);
             }
             pictures.Add(img);
-            return imageNumber - 1;
 
+            // returns image Index
+            return allPics.Count - 1;
         }
 
         public XSSFWorkbookType WorkbookType
@@ -2585,8 +2621,16 @@ namespace NPOI.XSSF.UserModel
 
         public bool Remove(ISheet item)
         {
+            string sheetName = item.SheetName;
+            int idx = sheets.FindIndex(_ => _.SheetName.Equals(sheetName, StringComparison.CurrentCultureIgnoreCase));
 
-            return this.sheets.Remove((XSSFSheet)item);
+            if (idx != -1)
+            {
+                RemoveSheetAt(idx);
+                return true;
+            }
+
+            return false;
         }
 
         #endregion

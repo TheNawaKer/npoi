@@ -626,6 +626,11 @@ namespace NPOI.OpenXmlFormats.Dml.Spreadsheet
             this.solidFillField = new CT_SolidColorFillProperties();
             return this.solidFillField;
         }
+        public CT_CustomGeometry2D AddNewCustGeom()
+        {
+            this.custGeomField = new CT_CustomGeometry2D();
+            return this.custGeomField;
+        }
         public bool IsSetPattFill()
         {
             return this.pattFillField != null;
@@ -1259,8 +1264,8 @@ namespace NPOI.OpenXmlFormats.Dml.Spreadsheet
             if (node == null)
                 return null;
             CT_AnchorClientData ctObj = new CT_AnchorClientData();
-            ctObj.fLocksWithSheet = XmlHelper.ReadBool(node.Attributes["fLocksWithSheet"]);
-            ctObj.fPrintsWithSheet = XmlHelper.ReadBool(node.Attributes["fPrintsWithSheet"]);
+            ctObj.fLocksWithSheet = XmlHelper.ReadBool(node.Attributes["fLocksWithSheet"], true);
+            ctObj.fPrintsWithSheet = XmlHelper.ReadBool(node.Attributes["fPrintsWithSheet"], true);
             return ctObj;
         }
 
@@ -1269,12 +1274,12 @@ namespace NPOI.OpenXmlFormats.Dml.Spreadsheet
         internal void Write(StreamWriter sw, string nodeName)
         {
             sw.Write(string.Format("<xdr:{0}", nodeName));
-            XmlHelper.WriteAttribute(sw, "fLocksWithSheet", this.fLocksWithSheet, false);
-            XmlHelper.WriteAttribute(sw, "fPrintsWithSheet", this.fPrintsWithSheet,false);
+            XmlHelper.WriteAttribute(sw, "fLocksWithSheet", this.fLocksWithSheet, false, true);
+            XmlHelper.WriteAttribute(sw, "fPrintsWithSheet", this.fPrintsWithSheet, false, true);
             sw.Write("/>");
         }
-        bool _fLocksWithSheet;
-        bool _fPrintsWithSheet;
+        bool _fLocksWithSheet = true;
+        bool _fPrintsWithSheet = true;
 
         [XmlAttribute]
         public bool fLocksWithSheet

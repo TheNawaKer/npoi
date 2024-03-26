@@ -14,17 +14,17 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 ==================================================================== */
+using NPOI.SS;
+using NPOI.SS.UserModel;
+using NPOI.SS.Util;
+using NPOI.Util;
+using NPOI.XSSF.UserModel;
 using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
-using NPOI.SS;
-using NPOI.SS.UserModel;
-using NPOI.SS.Util;
-using NPOI.Util;
-using NPOI.XSSF.UserModel;
 
 namespace NPOI.XSSF.Streaming
 {
@@ -37,6 +37,7 @@ namespace NPOI.XSSF.Streaming
         private IDictionary<int, SXSSFRow> _rows = new Dictionary<int, SXSSFRow>();
         private SheetDataWriter _writer;
         private int _randomAccessWindowSize = SXSSFWorkbook.DEFAULT_WINDOW_SIZE;
+        // Custom iZy
         public Lazy<AutoSizeColumnTracker> _autoSizeColumnTracker;
         private int outlineLevelRow = 0;
         private int lastFlushedRowNumber = -1;
@@ -58,7 +59,7 @@ namespace NPOI.XSSF.Streaming
 
         public void SetRandomAccessWindowSize(int value)
         {
-            if (value == 0 || value < -1)
+            if(value == 0 || value < -1)
             {
                 throw new ArgumentException("RandomAccessWindowSize must be either -1 or a positive integer");
             }
@@ -72,190 +73,192 @@ namespace NPOI.XSSF.Streaming
                 return _sh.Autobreaks;
             }
 
-			set { _sh.Autobreaks = value; }
-		}
+            set { _sh.Autobreaks = value; }
+        }
 
-		public int[] ColumnBreaks
-		{
-			get
-			{
-				return _sh.ColumnBreaks;
-			}
-			//set { _sh.ColumnBreaks = value; }
-		}
+        public int[] ColumnBreaks
+        {
+            get
+            {
+                return _sh.ColumnBreaks;
+            }
+            //set { _sh.ColumnBreaks = value; }
+        }
 
-		public int DefaultColumnWidth
-		{
-			get
-			{
-				return _sh.DefaultColumnWidth;
-			}
+        public double DefaultColumnWidth
+        {
+            get
+            {
+                return _sh.DefaultColumnWidth;
+            }
 
-			set
-			{
-				_sh.DefaultColumnWidth = value;
-			}
-		}
+            set
+            {
+                _sh.DefaultColumnWidth = value;
+            }
+        }
 
-		public short DefaultRowHeight
-		{
-			get { return _sh.DefaultRowHeight; }
+        public short DefaultRowHeight
+        {
+            get { return _sh.DefaultRowHeight; }
 
-			set
-			{
-				_sh.DefaultRowHeight = value;
-			}
-		}
+            set
+            {
+                _sh.DefaultRowHeight = value;
+            }
+        }
 
-		public float DefaultRowHeightInPoints
-		{
-			get
-			{
-				return _sh.DefaultRowHeightInPoints;
-			}
+        public float DefaultRowHeightInPoints
+        {
+            get
+            {
+                return _sh.DefaultRowHeightInPoints;
+            }
 
-			set
-			{
-				_sh.DefaultRowHeightInPoints = value;
-			}
-		}
+            set
+            {
+                _sh.DefaultRowHeightInPoints = value;
+            }
+        }
 
-		public bool DisplayFormulas
-		{
-			get
-			{
-				return _sh.DisplayFormulas;
-			}
+        public bool DisplayFormulas
+        {
+            get
+            {
+                return _sh.DisplayFormulas;
+            }
 
-			set { _sh.DisplayFormulas = value; }
-		}
+            set { _sh.DisplayFormulas = value; }
+        }
 
-		public bool DisplayGridlines
-		{
-			get
-			{
-				return _sh.DisplayGridlines;
-			}
+        public bool DisplayGridlines
+        {
+            get
+            {
+                return _sh.DisplayGridlines;
+            }
 
-			set
-			{
-				_sh.DisplayGridlines = value;
-			}
-		}
+            set
+            {
+                _sh.DisplayGridlines = value;
+            }
+        }
 
-		public bool DisplayGuts
-		{
-			get { return _sh.DisplayGuts; }
+        public bool DisplayGuts
+        {
+            get { return _sh.DisplayGuts; }
 
-			set
-			{
-				_sh.DisplayGuts = value;
-			}
-		}
+            set
+            {
+                _sh.DisplayGuts = value;
+            }
+        }
 
-		public bool DisplayRowColHeadings
-		{
-			get
-			{
-				return _sh.DisplayRowColHeadings;
-			}
+        public bool DisplayRowColHeadings
+        {
+            get
+            {
+                return _sh.DisplayRowColHeadings;
+            }
 
-			set
-			{
-				_sh.DisplayRowColHeadings = value;
-			}
-		}
+            set
+            {
+                _sh.DisplayRowColHeadings = value;
+            }
+        }
 
-		public bool DisplayZeros
-		{
-			get
-			{
-				return _sh.DisplayZeros;
-			}
+        public bool DisplayZeros
+        {
+            get
+            {
+                return _sh.DisplayZeros;
+            }
 
-			set
-			{
-				_sh.DisplayZeros = value;
-			}
-		}
+            set
+            {
+                _sh.DisplayZeros = value;
+            }
+        }
 
-		public IDrawing DrawingPatriarch
-		{
-			get
-			{
-				return _sh.DrawingPatriarch;
-			}
-		}
+        public IDrawing DrawingPatriarch
+        {
+            get
+            {
+                return _sh.DrawingPatriarch;
+            }
+        }
 
         public int FirstRowNum
         {
             get
             {
-                if (_writer.NumberOfFlushedRows > 0)
+                if(_writer.NumberOfFlushedRows > 0)
+                {
                     return _writer.LowestIndexOfFlushedRows;
+                }
                 return _rows.Count == 0 ? 0 : _FirstRowNum;
             }
         }
 
-		public bool FitToPage
-		{
-			get
-			{
-				return _sh.FitToPage;
-			}
+        public bool FitToPage
+        {
+            get
+            {
+                return _sh.FitToPage;
+            }
 
-			set { _sh.FitToPage = value; }
-		}
+            set { _sh.FitToPage = value; }
+        }
 
-		public IFooter Footer
-		{
-			get
-			{
-				return _sh.Footer;
-			}
-		}
+        public IFooter Footer
+        {
+            get
+            {
+                return _sh.Footer;
+            }
+        }
 
-		public bool ForceFormulaRecalculation
-		{
-			get
-			{
-				return _sh.ForceFormulaRecalculation;
-			}
+        public bool ForceFormulaRecalculation
+        {
+            get
+            {
+                return _sh.ForceFormulaRecalculation;
+            }
 
-			set { _sh.ForceFormulaRecalculation = value; }
-		}
+            set { _sh.ForceFormulaRecalculation = value; }
+        }
 
-		public IHeader Header
-		{
-			get { return _sh.Header; }
-		}
+        public IHeader Header
+        {
+            get { return _sh.Header; }
+        }
 
-		public bool HorizontallyCenter
-		{
-			get
-			{
-				return _sh.HorizontallyCenter;
-			}
+        public bool HorizontallyCenter
+        {
+            get
+            {
+                return _sh.HorizontallyCenter;
+            }
 
-			set { _sh.HorizontallyCenter = value; }
-		}
+            set { _sh.HorizontallyCenter = value; }
+        }
 
-		public bool IsActive
-		{
-			get
-			{
-				throw new NotImplementedException();
-			}
+        public bool IsActive
+        {
+            get
+            {
+                throw new NotImplementedException();
+            }
 
-			set
-			{
-				throw new NotImplementedException();
-			}
-		}
+            set
+            {
+                throw new NotImplementedException();
+            }
+        }
 
-		public bool IsPrintGridlines
-		{
-			get { return _sh.IsPrintGridlines; }
+        public bool IsPrintGridlines
+        {
+            get { return _sh.IsPrintGridlines; }
 
             set
             {
@@ -285,49 +288,49 @@ namespace NPOI.XSSF.Streaming
                 return _sh.IsRightToLeft;
             }
 
-			set
-			{
-				_sh.IsRightToLeft = value;
-			}
-		}
+            set
+            {
+                _sh.IsRightToLeft = value;
+            }
+        }
 
-		public bool IsSelected
-		{
-			get
-			{
-				return _sh.IsSelected;
-			}
+        public bool IsSelected
+        {
+            get
+            {
+                return _sh.IsSelected;
+            }
 
-			set
-			{
-				_sh.IsSelected = value;
-			}
-		}
+            set
+            {
+                _sh.IsSelected = value;
+            }
+        }
 
         public int LastRowNum
         {
             get
             {
-                if (_rows.Count == 0)
+                if(_rows.Count == 0)
                     return _writer.NumberOfFlushedRows > 0 ? LastFlushedRowNumber : 0;
-                return  _LastRowNum;
+                return _LastRowNum;
             }
         }
 
-		public short LeftCol
-		{
-			get { return _sh.LeftCol; }
+        public short LeftCol
+        {
+            get { return _sh.LeftCol; }
 
-			set
-			{
-				throw new NotImplementedException();
-			}
-		}
+            set
+            {
+                throw new NotImplementedException();
+            }
+        }
 
-		public int NumMergedRegions
-		{
-			get { return _sh.NumMergedRegions; }
-		}
+        public int NumMergedRegions
+        {
+            get { return _sh.NumMergedRegions; }
+        }
 
         /**
          * Returns the list of merged regions. If you want multiple regions, this is
@@ -344,129 +347,129 @@ namespace NPOI.XSSF.Streaming
             get { return _sh.PaneInformation; }
         }
 
-		public int PhysicalNumberOfRows
-		{
-			get
-			{
-				return _rows.Count + _writer.NumberOfFlushedRows;
-			}
-		}
+        public int PhysicalNumberOfRows
+        {
+            get
+            {
+                return _rows.Count + _writer.NumberOfFlushedRows;
+            }
+        }
 
-		public IPrintSetup PrintSetup
-		{
-			get { return _sh.PrintSetup; }
-		}
+        public IPrintSetup PrintSetup
+        {
+            get { return _sh.PrintSetup; }
+        }
 
-		public bool Protect
-		{
-			get { return _sh.Protect; }
-		}
+        public bool Protect
+        {
+            get { return _sh.Protect; }
+        }
 
-		public CellRangeAddress RepeatingColumns
-		{
-			get { return _sh.RepeatingColumns; }
+        public CellRangeAddress RepeatingColumns
+        {
+            get { return _sh.RepeatingColumns; }
 
-			set
-			{
-				_sh.RepeatingColumns = value;
-			}
-		}
+            set
+            {
+                _sh.RepeatingColumns = value;
+            }
+        }
 
-		public CellRangeAddress RepeatingRows
-		{
-			get { return _sh.RepeatingRows; }
+        public CellRangeAddress RepeatingRows
+        {
+            get { return _sh.RepeatingRows; }
 
-			set
-			{
-				_sh.RepeatingRows = value;
-			}
-		}
+            set
+            {
+                _sh.RepeatingRows = value;
+            }
+        }
 
-		public int[] RowBreaks
-		{
+        public int[] RowBreaks
+        {
 
-			get { return _sh.RowBreaks; }
+            get { return _sh.RowBreaks; }
 
-		}
+        }
 
-		public bool RowSumsBelow
-		{
-			get { return _sh.RowSumsBelow; }
+        public bool RowSumsBelow
+        {
+            get { return _sh.RowSumsBelow; }
 
-			set
-			{
-				_sh.RowSumsBelow = value;
-			}
-		}
+            set
+            {
+                _sh.RowSumsBelow = value;
+            }
+        }
 
-		public bool RowSumsRight
-		{
-			get { return _sh.RowSumsRight; }
+        public bool RowSumsRight
+        {
+            get { return _sh.RowSumsRight; }
 
-			set
-			{
-				_sh.RowSumsRight = value;
-			}
-		}
+            set
+            {
+                _sh.RowSumsRight = value;
+            }
+        }
 
-		public bool ScenarioProtect
-		{
-			get { return _sh.ScenarioProtect; }
-		}
+        public bool ScenarioProtect
+        {
+            get { return _sh.ScenarioProtect; }
+        }
 
-		public ISheetConditionalFormatting SheetConditionalFormatting
-		{
+        public ISheetConditionalFormatting SheetConditionalFormatting
+        {
 
-			get { return _sh.SheetConditionalFormatting; }
-		}
+            get { return _sh.SheetConditionalFormatting; }
+        }
 
-		public string SheetName
-		{
-			get { return _sh.SheetName; }
-		}
+        public string SheetName
+        {
+            get { return _sh.SheetName; }
+        }
 
-		public short TabColorIndex
-		{
-			get
-			{
-				throw new NotImplementedException();
-			}
+        public short TabColorIndex
+        {
+            get
+            {
+                throw new NotImplementedException();
+            }
 
-			set
-			{
-				throw new NotImplementedException();
-			}
-		}
+            set
+            {
+                throw new NotImplementedException();
+            }
+        }
 
-		public short TopRow
-		{
-			get { return _sh.TopRow; }
+        public short TopRow
+        {
+            get { return _sh.TopRow; }
 
-			set
-			{
-				_sh.TopRow = value;
-			}
-		}
+            set
+            {
+                _sh.TopRow = value;
+            }
+        }
 
-		public bool VerticallyCenter
-		{
-			get { return _sh.VerticallyCenter; }
+        public bool VerticallyCenter
+        {
+            get { return _sh.VerticallyCenter; }
 
-			set
-			{
-				_sh.VerticallyCenter = value;
-			}
-		}
+            set
+            {
+                _sh.VerticallyCenter = value;
+            }
+        }
 
-		public IWorkbook Workbook
-		{
-			get { return _workbook; }
-		}
+        public IWorkbook Workbook
+        {
+            get { return _workbook; }
+        }
 
-		public int AddMergedRegion(CellRangeAddress region)
-		{
-			return _sh.AddMergedRegion(region);
-		}
+        public int AddMergedRegion(CellRangeAddress region)
+        {
+            return _sh.AddMergedRegion(region);
+        }
 
         /// <summary>
         /// Adds a merged region of cells (hence those cells form one).
@@ -489,7 +492,8 @@ namespace NPOI.XSSF.Streaming
          * @throws InvalidOperationException if region intersects with a multi-cell array formula
          * @throws InvalidOperationException if at least one region intersects with another merged region in this sheet
          */
-        public void ValidateMergedRegions() {
+        public void ValidateMergedRegions()
+        {
             _sh.ValidateMergedRegions();
         }
 
@@ -567,19 +571,19 @@ namespace NPOI.XSSF.Streaming
                 // get the best fit width of rows already flushed to disk
                 flushedWidth = _autoSizeColumnTracker.Value.GetBestFitColumnWidth(column, useMergedCells);
             }
-            catch (Exception e)
+            catch(Exception e)
             {
                 throw new InvalidOperationException("Could not auto-size column. Make sure the column was tracked prior to auto-sizing the column.", e);
             }
 
-			// get the best-fit width of rows currently in the random access window
-			int activeWidth = (int)(256 * SheetUtil.GetColumnWidth(this, column, useMergedCells));
+            // get the best-fit width of rows currently in the random access window
+            int activeWidth = (int)(256 * SheetUtil.GetColumnWidth(this, column, useMergedCells));
 
-			// the best-fit width for both flushed rows and random access window rows
-			// flushedWidth or activeWidth may be negative if column contains only blank cells
-			int bestFitWidth = Math.Max(flushedWidth, activeWidth);
+            // the best-fit width for both flushed rows and random access window rows
+            // flushedWidth or activeWidth may be negative if column contains only blank cells
+            int bestFitWidth = Math.Max(flushedWidth, activeWidth);
 
-            if (bestFitWidth > 0)
+            if(bestFitWidth > 0)
             {
                 int maxColumnWidth = 255 * 256; // The maximum column width for an individual cell is 255 characters
                 int width = Math.Min(bestFitWidth, maxColumnWidth);
@@ -587,17 +591,28 @@ namespace NPOI.XSSF.Streaming
             }
         }
 
-		public IRow CopyRow(int sourceIndex, int targetIndex)
-		{
-			throw new NotImplementedException();
-		}
+        public IRow CopyRow(int sourceIndex, int targetIndex)
+        {
+            throw new NotImplementedException();
+        }
 
-		public ISheet CopySheet(string Name)
-		{
-			throw new NotImplementedException();
-		}
+        /// <summary>
+        /// Copies comment from one cell to another
+        /// </summary>
+        /// <param name="sourceCell">Cell with a comment to copy</param>
+        /// <param name="targetCell">Cell to paste the comment to</param>
+        /// <returns>Copied comment</returns>
+        public IComment CopyComment(ICell sourceCell, ICell targetCell)
+        {
+            throw new NotImplementedException();
+        }
 
-        public ISheet CopySheet(string Name,string newName, bool copyStyle)
+        public ISheet CopySheet(string Name)
+        {
+            throw new NotImplementedException();
+        }
+
+        public ISheet CopySheet(string Name, string newName, bool copyStyle)
         {
             throw new NotImplementedException();
         }
@@ -642,27 +657,27 @@ namespace NPOI.XSSF.Streaming
             return _sh.CreateDrawingPatriarch();
         }
 
-		public void CreateFreezePane(int colSplit, int rowSplit)
-		{
-			_sh.CreateFreezePane(colSplit, rowSplit);
-		}
+        public void CreateFreezePane(int colSplit, int rowSplit)
+        {
+            _sh.CreateFreezePane(colSplit, rowSplit);
+        }
 
-		public void CreateFreezePane(int colSplit, int rowSplit, int leftmostColumn, int topRow)
-		{
-			_sh.CreateFreezePane(colSplit, rowSplit, leftmostColumn, topRow);
-		}
+        public void CreateFreezePane(int colSplit, int rowSplit, int leftmostColumn, int topRow)
+        {
+            _sh.CreateFreezePane(colSplit, rowSplit, leftmostColumn, topRow);
+        }
 
         public IRow CreateRow(int rownum)
         {
             int maxrow = SpreadsheetVersion.EXCEL2007.LastRowIndex;
-            if (rownum < 0 || rownum > maxrow)
+            if(rownum < 0 || rownum > maxrow)
             {
                 throw new ArgumentException("Invalid row number (" + rownum
                         + ") outside allowable range (0.." + maxrow + ")");
             }
 
             // attempt to overwrite a row that is already flushed to disk
-            if (rownum <= _writer.NumberLastFlushedRow)
+            if(rownum <= _writer.NumberLastFlushedRow)
             {
                 throw new ArgumentException(
                         "Attempting to write a row[" + rownum + "] " +
@@ -670,7 +685,7 @@ namespace NPOI.XSSF.Streaming
             }
 
             // attempt to overwrite a existing row in the input template
-            if (_sh.PhysicalNumberOfRows > 0 && rownum <= _sh.LastRowNum)
+            if(_sh.PhysicalNumberOfRows > 0 && rownum <= _sh.LastRowNum)
             {
                 throw new ArgumentException(
                         "Attempting to write a row[" + rownum + "] " +
@@ -683,13 +698,13 @@ namespace NPOI.XSSF.Streaming
             UpdateIndexWhenAdd(rownum);
 
             allFlushed = false;
-            if (_randomAccessWindowSize >= 0 && _rows.Count > _randomAccessWindowSize)
+            if(_randomAccessWindowSize >= 0 && _rows.Count > _randomAccessWindowSize)
             {
                 try
                 {
                     FlushRows(_randomAccessWindowSize, false);
                 }
-                catch (IOException ioe)
+                catch(IOException ioe)
                 {
                     throw new RuntimeException(ioe);
                 }
@@ -699,12 +714,12 @@ namespace NPOI.XSSF.Streaming
 
         private void UpdateIndexWhenAdd(int rownum)
         {
-            if (_FirstRowNum == -1 || rownum < _FirstRowNum)
+            if(_FirstRowNum == -1 || rownum < _FirstRowNum)
             {
                 _FirstRowNum = rownum;
             }
 
-            if (rownum > _LastRowNum)
+            if(rownum > _LastRowNum)
             {
                 _LastRowNum = rownum;
             }
@@ -745,55 +760,55 @@ namespace NPOI.XSSF.Streaming
             return _sh.GetCellComments();
         }
 
-		public int GetColumnOutlineLevel(int columnIndex)
-		{
-			return _sh.GetColumnOutlineLevel(columnIndex);
-		}
+        public int GetColumnOutlineLevel(int columnIndex)
+        {
+            return _sh.GetColumnOutlineLevel(columnIndex);
+        }
 
-		public ICellStyle GetColumnStyle(int column)
-		{
-			return _sh.GetColumnStyle(column);
-		}
+        public ICellStyle GetColumnStyle(int column)
+        {
+            return _sh.GetColumnStyle(column);
+        }
 
-		public int GetColumnWidth(int columnIndex)
-		{
-			return _sh.GetColumnWidth(columnIndex);
-		}
+        public double GetColumnWidth(int columnIndex)
+        {
+            return _sh.GetColumnWidth(columnIndex);
+        }
 
-		public float GetColumnWidthInPixels(int columnIndex)
-		{
-			return _sh.GetColumnWidthInPixels(columnIndex);
-		}
+        public double GetColumnWidthInPixels(int columnIndex)
+        {
+            return _sh.GetColumnWidthInPixels(columnIndex);
+        }
 
 
-		public IDataValidationHelper GetDataValidationHelper()
-		{
-			return _sh.GetDataValidationHelper();
-		}
+        public IDataValidationHelper GetDataValidationHelper()
+        {
+            return _sh.GetDataValidationHelper();
+        }
 
-		public List<IDataValidation> GetDataValidations()
-		{
-			return _sh.GetDataValidations();
-		}
+        public List<IDataValidation> GetDataValidations()
+        {
+            return _sh.GetDataValidations();
+        }
 
         public IEnumerator GetEnumerator()
         {
-            return (IEnumerator<IRow>)new SortedDictionary<int,SXSSFRow>(_rows).Values.GetEnumerator();
+            return (IEnumerator<IRow>) new SortedDictionary<int, SXSSFRow>(_rows).Values.GetEnumerator();
         }
 
-		public double GetMargin(MarginType margin)
-		{
-			return _sh.GetMargin(margin);
-		}
+        public double GetMargin(MarginType margin)
+        {
+            return _sh.GetMargin(margin);
+        }
 
-		public CellRangeAddress GetMergedRegion(int index)
-		{
-			return _sh.GetMergedRegion(index);
-		}
+        public CellRangeAddress GetMergedRegion(int index)
+        {
+            return _sh.GetMergedRegion(index);
+        }
 
         public IRow GetRow(int rownum)
         {
-            if (_rows.ContainsKey(rownum))
+            if(_rows.ContainsKey(rownum))
                 return _rows[rownum];
             else
                 return null;
@@ -804,96 +819,102 @@ namespace NPOI.XSSF.Streaming
             return GetEnumerator();
         }
 
-		public void GroupColumn(int fromColumn, int toColumn)
-		{
-			_sh.GroupColumn(fromColumn, toColumn);
-		}
+        public void GroupColumn(int fromColumn, int toColumn)
+        {
+            _sh.GroupColumn(fromColumn, toColumn);
+        }
 
 
-		//TODO: test
-		public void GroupRow(int fromRow, int toRow)
-		{
-			var groupRows = _rows.Where(kvp => kvp.Key >= fromRow && kvp.Key <= toRow + 1).Select(r => r.Value);
-			foreach (SXSSFRow row in groupRows)
-			{
-				int level = row.OutlineLevel + 1;
-				row.OutlineLevel = level;
+        //TODO: test
+        public void GroupRow(int fromRow, int toRow)
+        {
+            var groupRows = _rows.Where(kvp => kvp.Key >= fromRow && kvp.Key <= toRow + 1).Select(r => r.Value);
+            foreach(SXSSFRow row in groupRows)
+            {
+                int level = row.OutlineLevel + 1;
+                row.OutlineLevel = level;
 
-				if (level > outlineLevelRow) outlineLevelRow = level;
-			}
+                if(level > outlineLevelRow)
+                {
+                    outlineLevelRow = level;
+                }
+            }
 
-			SetWorksheetOutlineLevelRow();
-		}
+            SetWorksheetOutlineLevelRow();
+        }
 
-		/**
- * Set row groupings (like groupRow) in a stream-friendly manner
- *
- * <p>
- *    groupRows requires all rows in the group to be in the current window.
- *    This is not always practical.  Instead use setRowOutlineLevel to 
- *    explicitly set the group level.  Level 1 is the top level group, 
- *    followed by 2, etc.  It is up to the user to ensure that level 2
- *    groups are correctly nested under level 1, etc.
- * </p>
- *
- * @param rownum    index of row to update (0-based)
- * @param level     outline level (greater than 0)
- */
-		public void SetRowOutlineLevel(int rownum, int level)
-		{
-			SXSSFRow row = _rows[rownum];
+        /**
+         * Set row groupings (like groupRow) in a stream-friendly manner
+         *
+         * <p>
+         *    groupRows requires all rows in the group to be in the current window.
+         *    This is not always practical.  Instead use setRowOutlineLevel to 
+         *    explicitly set the group level.  Level 1 is the top level group, 
+         *    followed by 2, etc.  It is up to the user to ensure that level 2
+         *    groups are correctly nested under level 1, etc.
+         * </p>
+         *
+         * @param rownum    index of row to update (0-based)
+         * @param level     outline level (greater than 0)
+         */
+        public void SetRowOutlineLevel(int rownum, int level)
+        {
+            SXSSFRow row = _rows[rownum];
 
-			row.OutlineLevel = level;
-			if (level > 0 && level > outlineLevelRow)
-			{
-				outlineLevelRow = level;
-				SetWorksheetOutlineLevelRow();
-			}
-		}
+            row.OutlineLevel = level;
+            if(level > 0 && level > outlineLevelRow)
+            {
+                outlineLevelRow = level;
+                SetWorksheetOutlineLevelRow();
+            }
+        }
 
-		private void SetWorksheetOutlineLevelRow()
-		{
-			var ct = _sh.GetCTWorksheet();
-			var pr = ct.IsSetSheetFormatPr() ?
-				ct.sheetFormatPr :
-				ct.AddNewSheetFormatPr();
-			if (outlineLevelRow > 0) pr.outlineLevelRow = (byte)outlineLevelRow;
-		}
+        private void SetWorksheetOutlineLevelRow()
+        {
+            var ct = _sh.GetCTWorksheet();
+            var pr = ct.IsSetSheetFormatPr() ?
+                ct.sheetFormatPr :
+                ct.AddNewSheetFormatPr();
+            if(outlineLevelRow > 0)
+            {
+                pr.outlineLevelRow = (byte) outlineLevelRow;
+            }
+        }
 
-		public bool IsColumnBroken(int column)
-		{
-			return _sh.IsColumnBroken(column);
-		}
+        public bool IsColumnBroken(int column)
+        {
+            return _sh.IsColumnBroken(column);
+        }
 
-		public bool IsColumnHidden(int columnIndex)
-		{
-			return _sh.IsColumnHidden(columnIndex);
-		}
+        public bool IsColumnHidden(int columnIndex)
+        {
+            return _sh.IsColumnHidden(columnIndex);
+        }
 
-		public bool IsMergedRegion(CellRangeAddress mergedRegion)
-		{
-			throw new NotImplementedException();
-		}
+        public bool IsMergedRegion(CellRangeAddress mergedRegion)
+        {
+            throw new NotImplementedException();
+        }
 
-		public bool IsRowBroken(int row)
-		{
-			return _sh.IsRowBroken(row);
-		}
+        public bool IsRowBroken(int row)
+        {
+            return _sh.IsRowBroken(row);
+        }
 
-		public void ProtectSheet(string password)
-		{
-			_sh.ProtectSheet(password);
-		}
+        public void ProtectSheet(string password)
+        {
+            _sh.ProtectSheet(password);
+        }
 
-		public ICellRange<ICell> RemoveArrayFormula(ICell cell)
-		{
-			return _sh.RemoveArrayFormula(cell);
-		}
+        public ICellRange<ICell> RemoveArrayFormula(ICell cell)
+        {
+            return _sh.RemoveArrayFormula(cell);
+        }
 
-		public void RemoveColumnBreak(int column)
-		{
-			_sh.RemoveColumnBreak(column);
-		}
+        public void RemoveColumnBreak(int column)
+        {
+            _sh.RemoveColumnBreak(column);
+        }
 
         public void RemoveMergedRegion(int index)
         {
@@ -910,11 +931,11 @@ namespace NPOI.XSSF.Streaming
         }
         public void RemoveRow(IRow row)
         {
-            if (row == null)
+            if(row == null)
             {
                 throw new ArgumentException("Invalid row (null)");
             }
-            if (row.Sheet != this)
+            if(row.Sheet != this)
             {
                 throw new ArgumentException("Specified row does not belong to this sheet");
             }
@@ -931,33 +952,33 @@ namespace NPOI.XSSF.Streaming
             var invalidatedLast = false;
             foreach(var key in toRemove)
             {
-                if (key == _FirstRowNum)
+                if(key == _FirstRowNum)
                 {
                     invalidatedFirst = true;
                 }
 
-                if (key >= (_LastRowNum -1))
+                if(key >= (_LastRowNum -1))
                 {
                     invalidatedLast = true;
                 }
                 _rows.Remove(key);
             }
 
-            if (invalidatedFirst)
+            if(invalidatedFirst)
             {
                 InvalidateFirstRowNum();
             }
 
-            if (invalidatedLast)
+            if(invalidatedLast)
             {
                 InvalidateLastRowNum();
             }
-            
+
         }
 
         private void InvalidateFirstRowNum()
         {
-            if (_rows.Count == 0)
+            if(_rows.Count == 0)
             {
                 _FirstRowNum = -1;
             }
@@ -966,10 +987,10 @@ namespace NPOI.XSSF.Streaming
                 _FirstRowNum = _rows.Keys.Min();
             }
         }
-        
+
         private void InvalidateLastRowNum()
         {
-            if (_rows.Count == 0)
+            if(_rows.Count == 0)
             {
                 _LastRowNum = -1;
             }
@@ -984,60 +1005,60 @@ namespace NPOI.XSSF.Streaming
             _sh.RemoveRowBreak(row);
         }
 
-		public void SetActive(bool value)
-		{
-			throw new NotImplementedException();
-		}
+        public void SetActive(bool value)
+        {
+            throw new NotImplementedException();
+        }
 
-		public void SetActiveCell(int row, int column)
-		{
-			throw new NotImplementedException();
-		}
+        public void SetActiveCell(int row, int column)
+        {
+            throw new NotImplementedException();
+        }
 
-		public void SetActiveCellRange(List<CellRangeAddress8Bit> cellranges, int activeRange, int activeRow, int activeColumn)
-		{
-			throw new NotImplementedException();
-		}
+        public void SetActiveCellRange(List<CellRangeAddress8Bit> cellranges, int activeRange, int activeRow, int activeColumn)
+        {
+            throw new NotImplementedException();
+        }
 
-		public void SetActiveCellRange(int firstRow, int lastRow, int firstColumn, int lastColumn)
-		{
-			throw new NotImplementedException();
-		}
+        public void SetActiveCellRange(int firstRow, int lastRow, int firstColumn, int lastColumn)
+        {
+            throw new NotImplementedException();
+        }
 
-		public ICellRange<ICell> SetArrayFormula(string formula, CellRangeAddress range)
-		{
-			return _sh.SetArrayFormula(formula, range);
-		}
+        public ICellRange<ICell> SetArrayFormula(string formula, CellRangeAddress range)
+        {
+            return _sh.SetArrayFormula(formula, range);
+        }
 
-		public IAutoFilter SetAutoFilter(CellRangeAddress range)
-		{
-			return _sh.SetAutoFilter(range);
-		}
+        public IAutoFilter SetAutoFilter(CellRangeAddress range)
+        {
+            return _sh.SetAutoFilter(range);
+        }
 
-		public void SetColumnBreak(int column)
-		{
-			_sh.SetColumnBreak(column);
-		}
+        public void SetColumnBreak(int column)
+        {
+            _sh.SetColumnBreak(column);
+        }
 
-		public void SetColumnGroupCollapsed(int columnNumber, bool collapsed)
-		{
-			_sh.SetColumnGroupCollapsed(columnNumber, collapsed);
-		}
+        public void SetColumnGroupCollapsed(int columnNumber, bool collapsed)
+        {
+            _sh.SetColumnGroupCollapsed(columnNumber, collapsed);
+        }
 
-		public void SetColumnHidden(int columnIndex, bool hidden)
-		{
-			_sh.SetColumnHidden(columnIndex, hidden);
-		}
+        public void SetColumnHidden(int columnIndex, bool hidden)
+        {
+            _sh.SetColumnHidden(columnIndex, hidden);
+        }
 
-		public void SetColumnWidth(int columnIndex, int width)
-		{
-			_sh.SetColumnWidth(columnIndex, width);
-		}
+        public void SetColumnWidth(int columnIndex, double width)
+        {
+            _sh.SetColumnWidth(columnIndex, width);
+        }
 
-		public void SetDefaultColumnStyle(int column, ICellStyle style)
-		{
-			_sh.SetDefaultColumnStyle(column, style);
-		}
+        public void SetDefaultColumnStyle(int column, ICellStyle style)
+        {
+            _sh.SetDefaultColumnStyle(column, style);
+        }
 
 
         /**
@@ -1153,49 +1174,49 @@ namespace NPOI.XSSF.Streaming
             _sh.SetMargin(margin, size);
         }
 
-		public void SetRowBreak(int row)
-		{
-			_sh.SetRowBreak(row);
-		}
+        public void SetRowBreak(int row)
+        {
+            _sh.SetRowBreak(row);
+        }
 
-		public void SetRowGroupCollapsed(int row, bool collapse)
-		{
-			if (collapse)
-			{
-				collapseRow(row);
-			}
-			else
-			{
-				//expandRow(rowIndex);
-				throw new RuntimeException("Unable to expand row: Not Implemented");
-			}
-		}
+        public void SetRowGroupCollapsed(int row, bool collapse)
+        {
+            if(collapse)
+            {
+                collapseRow(row);
+            }
+            else
+            {
+                //expandRow(rowIndex);
+                throw new RuntimeException("Unable to expand row: Not Implemented");
+            }
+        }
 
-		private void collapseRow(int rowIndex)
-		{
-			SXSSFRow row = (SXSSFRow)GetRow(rowIndex);
-			if (row == null)
-			{
-				throw new InvalidOperationException("Invalid row number(" + rowIndex + "). Row does not exist.");
-			}
-			else
-			{
-				int startRow = FindStartOfRowOutlineGroup(rowIndex);
+        private void collapseRow(int rowIndex)
+        {
+            SXSSFRow row = (SXSSFRow)GetRow(rowIndex);
+            if(row == null)
+            {
+                throw new InvalidOperationException("Invalid row number(" + rowIndex + "). Row does not exist.");
+            }
+            else
+            {
+                int startRow = FindStartOfRowOutlineGroup(rowIndex);
 
-				// Hide all the columns until the end of the group
-				int lastRow = WriteHidden(row, startRow, true);
-				SXSSFRow lastRowObj = (SXSSFRow)GetRow(lastRow);
-				if (lastRowObj != null)
-				{
-					lastRowObj.Collapsed = true;
-				}
-				else
-				{
-					SXSSFRow newRow = (SXSSFRow)CreateRow(lastRow);
-					newRow.Collapsed = true;
-				}
-			}
-		}
+                // Hide all the columns until the end of the group
+                int lastRow = WriteHidden(row, startRow, true);
+                SXSSFRow lastRowObj = (SXSSFRow)GetRow(lastRow);
+                if(lastRowObj != null)
+                {
+                    lastRowObj.Collapsed = true;
+                }
+                else
+                {
+                    SXSSFRow newRow = (SXSSFRow)CreateRow(lastRow);
+                    newRow.Collapsed = true;
+                }
+            }
+        }
 
         /**
          * @param rowIndex the zero based row index to find from
@@ -1205,33 +1226,35 @@ namespace NPOI.XSSF.Streaming
             // Find the start of the group.
             IRow row = GetRow(rowIndex);
             int level = ((SXSSFRow)row).OutlineLevel;
-            if (level == 0)
+            if(level == 0)
             {
                 throw new InvalidOperationException("Outline level is zero for the row (" + rowIndex + ").");
             }
             int currentRow = rowIndex;
-            while (GetRow(currentRow) != null)
+            while(GetRow(currentRow) != null)
             {
-                if (GetRow(currentRow).OutlineLevel < level)
+                if(GetRow(currentRow).OutlineLevel < level)
+                {
                     return currentRow + 1;
+                }
                 currentRow--;
             }
             return currentRow + 1;
         }
 
-		private int WriteHidden(SXSSFRow xRow, int rowIndex, bool hidden)
-		{
-			int level = xRow.OutlineLevel;
-			var currRow = (SXSSFRow)GetRow(rowIndex);
+        private int WriteHidden(SXSSFRow xRow, int rowIndex, bool hidden)
+        {
+            int level = xRow.OutlineLevel;
+            var currRow = (SXSSFRow)GetRow(rowIndex);
 
-			while (currRow != null && currRow.OutlineLevel >= level)
-			{
-				currRow.Hidden = hidden;
-				rowIndex++;
-				currRow = (SXSSFRow)GetRow(rowIndex);
-			}
-			return rowIndex;
-		}
+            while(currRow != null && currRow.OutlineLevel >= level)
+            {
+                currRow.Hidden = hidden;
+                rowIndex++;
+                currRow = (SXSSFRow) GetRow(rowIndex);
+            }
+            return rowIndex;
+        }
 
         [Obsolete("deprecated 2015-11-23 (circa POI 3.14beta1). Use {@link #setZoom(int)} instead.")]
         public void SetZoom(int numerator, int denominator)
@@ -1269,40 +1292,44 @@ namespace NPOI.XSSF.Streaming
             throw new NotImplementedException();
         }
 
-		public void ShiftRows(int startRow, int endRow, int n, bool copyRowHeight, bool resetOriginalRowHeight)
-		{
-			throw new NotImplementedException();
-		}
+        public void ShiftRows(int startRow, int endRow, int n, bool copyRowHeight, bool resetOriginalRowHeight)
+        {
+            throw new NotImplementedException();
+        }
 
         public void ShowInPane(int toprow, int leftcol)
         {
             _sh.ShowInPane(toprow, leftcol);
         }
 
-		public void UngroupColumn(int fromColumn, int toColumn)
-		{
-			_sh.UngroupColumn(fromColumn, toColumn);
+        public void UngroupColumn(int fromColumn, int toColumn)
+        {
+            _sh.UngroupColumn(fromColumn, toColumn);
 
-		}
+        }
 
-		public void UngroupRow(int fromRow, int toRow)
-		{
-			_sh.UngroupRow(fromRow, toRow);
-		}
+        public void UngroupRow(int fromRow, int toRow)
+        {
+            _sh.UngroupRow(fromRow, toRow);
+        }
 
         public bool IsDate1904()
         {
             return _workbook.IsDate1904();
         }
+
         public int GetRowNum(SXSSFRow row)
         {
-            foreach (KeyValuePair<int, SXSSFRow> entry in _rows)
+            foreach(KeyValuePair<int, SXSSFRow> entry in _rows)
             {
-                if (entry.Value == row)
+                if(entry.Value == row)
+                {
                     return entry.Key;
+                }
             }
             return -1;
         }
+
         public void ChangeRowNum(SXSSFRow row, int newRowNum)
         {
 
@@ -1313,35 +1340,40 @@ namespace NPOI.XSSF.Streaming
 
         public bool Dispose()
         {
-            if (!allFlushed) FlushRows();
+            if(!allFlushed)
+            {
+                FlushRows();
+            }
             return _writer.Dispose();
         }
+
         /**
- * Specifies how many rows can be accessed at most via getRow().
- * The exceeding rows (if any) are flushed to the disk while rows
- * with lower index values are flushed first.
- */
+         * Specifies how many rows can be accessed at most via getRow().
+         * The exceeding rows (if any) are flushed to the disk while rows
+         * with lower index values are flushed first.
+         */
         private void FlushRows(int remaining, bool flushOnDisk)
         {
             KeyValuePair<int, SXSSFRow>? lastRow = null;
             var flushedRowsCount = 0;
-            
-            while (_rows.Count > remaining)
+
+            while(_rows.Count > remaining)
             {
                 flushedRowsCount++;
                 lastRow = flushOneRow();
             }
-            
+
             InvalidateFirstRowNum();
             InvalidateLastRowNum();
 
-            if (remaining == 0) 
+            if(remaining == 0)
                 allFlushed = true;
 
             //TODO: review this.
-            if (lastRow != null && flushOnDisk)
+            if(lastRow != null && flushOnDisk)
                 _writer.FlushRows(flushedRowsCount, lastRow.Value.Key, lastRow.Value.Value.LastCellNum);
-       }
+        }
+
         /*
          * Are all rows flushed to disk?
          */
@@ -1352,6 +1384,7 @@ namespace NPOI.XSSF.Streaming
                 return allFlushed;
             }
         }
+
         /**
          * @return Last row number to be flushed to disk, or -1 if none flushed yet
          */
@@ -1370,7 +1403,7 @@ namespace NPOI.XSSF.Streaming
 
         private KeyValuePair<int, SXSSFRow>? flushOneRow()
         {
-            if (_rows.Count == 0)
+            if(_rows.Count == 0)
                 return null;
 
             var firstRowNum = _rows.Keys.Min();
@@ -1380,7 +1413,7 @@ namespace NPOI.XSSF.Streaming
             _writer.WriteRow(firstRowNum, firstRow);
             _rows.Remove(firstRowNum);
             lastFlushedRowNumber = firstRowNum;
-            return new KeyValuePair<int, SXSSFRow>(firstRowNum,firstRow);
+            return new KeyValuePair<int, SXSSFRow>(firstRowNum, firstRow);
         }
 
         /* Gets "<sheetData>" document fragment*/

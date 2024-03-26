@@ -65,10 +65,11 @@ namespace NPOI.OpenXmlFormats.Spreadsheet
 
         internal void Write(StreamWriter sw, string nodeName)
         {
-            sw.Write(string.Format("<{0}", nodeName));
+            sw.Write("<");
+            sw.Write(nodeName);
 
             XmlHelper.WriteAttribute(sw, "r", this.r);
-            XmlHelper.WriteAttribute(sw, "s", this.s);
+            XmlHelper.WriteAttribute(sw, "s", this.s, true);
             if (this.t != ST_CellType.n)
                 XmlHelper.WriteAttribute(sw, "t", this.t.ToString());
             XmlHelper.WriteAttribute(sw, "cm", this.cm);
@@ -87,14 +88,14 @@ namespace NPOI.OpenXmlFormats.Spreadsheet
                 if (this.f != null)
                     this.f.Write(sw, "f");
                 if (!string.IsNullOrEmpty(this.v))
-                    sw.Write(string.Format("<v>{0}</v>", XmlHelper.EncodeXml(this.v)));
+                    sw.WriteElementAndContent("v", XmlHelper.EncodeXml(this.v));
                 else
                     sw.Write("<v/>");
                 if (this.@is != null)
                     this.@is.Write(sw, "is");
                 if (this.extLst != null)
                     this.extLst.Write(sw, "extLst");
-                sw.Write(string.Format("</{0}>", nodeName));
+                sw.WriteEndElement(nodeName);
             }
         }
 

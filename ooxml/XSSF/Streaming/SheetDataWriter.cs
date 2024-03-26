@@ -231,7 +231,7 @@ namespace NPOI.XSSF.Streaming
 
             if (row.HasCustomHeight())
             {
-                WriteAsBytes(" customHeight=\"true\"  ht=\"");
+                WriteAsBytes(" customHeight=\"true\" ht=\"");
                 WriteAsBytes(row.HeightInPoints);
                 WriteAsBytes("\"");
             }
